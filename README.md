@@ -77,7 +77,7 @@ CREATE TABLE `sites` (
 )
 COLLATE='latin1_swedish_ci'
 ENGINE=InnoDB
-AUTO_INCREMENT=29968
+AUTO_INCREMENT=1
 ;
 ```
 
