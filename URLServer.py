@@ -6,10 +6,7 @@ import datetime
 init()
 ClientCount = 0
 
-errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]"
-addcode = F"{Fore.WHITE}[{Fore.GREEN}+{Fore.WHITE}]"
-checkcode = F"{Fore.WHITE}[{Fore.YELLOW}~{Fore.WHITE}]"
-foundcheck = F"{Fore.WHITE}[{Fore.MAGENTA}~{Fore.WHITE}]"
+ServerInfo = F"{Fore.WHITE}[{Fore.MAGENTA}Server Info{Fore.WHITE}]{Fore.MAGENTA}"
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -96,9 +93,18 @@ def update_checked_urls_route():
 def newclient():
     global ClientCount
     ClientCount = ClientCount + 1
+    print(f"{ServerInfo} New Client Registered {ClientCount}")
     response = {'Client': str(ClientCount)}
-    #return str(ClientCount)
     return jsonify(response)
+
+@app.route('/disconnect', methods=['POST'])
+def disconnect():
+    data = request.json
+    Disconnect_ID = data.get('ID', [])
+    Disconnect_Url = data.get('URL', [])
+    #DB.update_checked_status(data.get('checked_urls', []))
+    print(f"{ServerInfo} Client {Fore.CYAN}{Disconnect_ID}{Fore.MAGENTA} disconnected, rechecking {Fore.WHITE}{Disconnect_Url}")
+    return "Ok"
 
 @app.route('/entries', methods=['GET'])
 def entries():

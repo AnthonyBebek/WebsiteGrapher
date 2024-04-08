@@ -8,8 +8,8 @@ init()
 errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]{Fore.RED}"
 addcode = F"{Fore.WHITE}[{Fore.GREEN}+{Fore.WHITE}]{Fore.GREEN}"
 checkcode = F"{Fore.WHITE}[{Fore.YELLOW}~{Fore.WHITE}]{Fore.YELLOW}"
-foundcheck = F"{Fore.WHITE}[{Fore.MAGENTA}~{Fore.WHITE}]{Fore.MAGENTA}"
-IDCodeOpen = F"{Fore.WHITE}[{Fore.CYAN}"
+foundcheck = F"{Fore.WHITE}[{Fore.MAGENTA}Server Info{Fore.WHITE}]{Fore.MAGENTA}"
+IDCodeOpen = F"{Fore.WHITE}[{Fore.CYAN}Client: "
 IDCodeClose = F"{Fore.WHITE}]"
 
 
@@ -209,9 +209,8 @@ def get_data_simple():
     
     return result
 
-
-
-# --------------- Example usage -----------------
-
-#update_checked_status("https://example.com")
-#insert_into_sites("https://example.com")
+if __name__ == '__main__':
+    print()
+    print("-----------------------------------")
+    print("Hey! Run URLServer.py not this file")
+    print("-----------------------------------")
