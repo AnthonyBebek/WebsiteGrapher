@@ -7,6 +7,8 @@ from urllib.parse import urljoin
 from colorama import init, Fore, Style
 init()
 
+id = 0
+
 addcode = F"{Fore.WHITE}[{Fore.GREEN}+{Fore.WHITE}]"
 errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]{Fore.RED}"
 checkcode = F"{Fore.WHITE}[{Fore.YELLOW}~{Fore.WHITE}]{Fore.YELLOW}"
@@ -21,7 +23,6 @@ def get_links(url, timeout=5):
         response = requests.get(url, timeout=timeout)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-
         links = list({urlparse(urljoin(url, a['href'])).scheme + '://' + '.'.join(urlparse(urljoin(url, a['href'])).netloc.split('.')[-2:]) for a in soup.find_all('a', href=True) if url not in urljoin(url, a['href'])})
         return links
 
@@ -43,6 +44,9 @@ def get_links(url, timeout=5):
     except RequestException as e:
         print(F"{errorcode} Error: {e}")
         return []
+    except KeyboardInterrupt:
+        print(F"{checkcode} Exiting")
+        exit()
     except:
         print(F"{errorcode} Unknown Error, Skipping!")
 
@@ -58,9 +62,9 @@ def get_current_url():
     except Exception as e:
         print(f"Error: {e}")
 
-def update_url(new_url):
+def update_url(new_url, id, old_url = ""):
     server_url =  ServerIP + "/update"
-    payload = {'url': new_url}
+    payload = {'url': new_url, 'old_url': old_url, 'Client': id}
     try:
         response = requests.post(server_url, json=payload)
         if response.status_code == 200:
@@ -80,26 +84,35 @@ def update_checked_urls(checked_urls):
     except Exception as e:
         print(f"Error: {e}")
 
+def get_id():
+    server_url = ServerIP + "/newclient"
+    try:
+        response = requests.get(server_url)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('Client', 'No URL found')
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+    except Exception as e:
+        print(f"Error: {e}")
+
 def main():
+    id = get_id()
+    print(id)
     links = get_links(BeginURL)
-    update_url(BeginURL)
+    update_url(BeginURL, id)
     update_checked_urls(BeginURL)
 
     for i in links:
-        update_url(i)
+        update_url(i, id, BeginURL)
 
     while True:
         url = get_current_url()
         links = get_links(url)
-        update_url(url)
+        update_url(url, id)
         update_checked_urls(url)
         for i in links:
-            update_url(i)
+            update_url(i, id, url)
 
 if __name__ == "__main__":
-    current_url = get_current_url()
-    print(f"Current URL: {current_url}")
-    new_url = "https://neewexamplwwe.com"
-    update_url(new_url)
-    updated_url = get_current_url()
     main()
