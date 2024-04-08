@@ -11,19 +11,19 @@
 <br />
 <div align="center">
 
-  <h3 align="center">WebCrawler</h3>
+  <h3 align="center">WebsiteGrapher</h3>
 
   <p align="center">
-    These are the server and client files for the WebCrawler Project
+    These are the server and client files for the WebsiteGrapher Project
     <br />
-    <a href="https://github.com/AnthonyBebek/WebCrawler"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/AnthonyBebek/WebsiteGrapher"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/AnthonyBebek/WebCrawler">View Demo</a>
+    <a href="https://github.com/AnthonyBebek/WebsiteGrapher">View Demo</a>
     ·
-    <a href="https://github.com/AnthonyBebek/WebCrawler/issues">Report Bug</a>
+    <a href="https://github.com/AnthonyBebek/WebsiteGrapher/issues">Report Bug</a>
     ·
-    <a href="https://github.com/AnthonyBebek/WebCrawler/issues">Request Feature</a>
+    <a href="https://github.com/AnthonyBebek/WebsiteGrapher/issues">Request Feature</a>
   </p>
 </div>
 
@@ -97,6 +97,10 @@ By running ```SmartGraphing.py``` you can provide a URL and see what websites li
 
 *Note: This is 50 random websites that reference https://facebook.com, Websites with more than 50 references gives you the option to limit the selection to 50.*
 
+<img src="Readme_Files/website.png" alt="drawing" width="500"/>
+
+*Note: Navigate to http://{Server IP}:27016/stats to view the DB stats and any incoming URLs*
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
@@ -149,13 +153,13 @@ To run the client scripts, the client must have python3 installed on the system 
 
 1. Open up a command prompt window or temrinal and navigate to where you want to clone this repo to
 
-2. Run the following command ``` git clone https://github.com/AnthonyBebek/WebCrawler```
+2. Run the following command ``` git clone https://github.com/AnthonyBebek/WebsiteGrapher```
 
 3. Run the following commands ```python3 -m pip install requests beautifulsoup4 colorama```
 
 4. Change SererIP to point towards your server e.g ```ServerIP = "http://127.0.0.1:27016"```
 
-5. Run ```python3 /WebCrawler/RunClient.py```
+5. Run ```python3 /WebsiteGrapher/RunClient.py```
 
 #### Server Setup
 
@@ -163,13 +167,13 @@ To run the server scripts, the client must have python3 installed on the system 
 
 1. Open up a command prompt window or temrinal and navigate to where you want to clone this repo to
 
-2. Run the following command ``` git clone https://github.com/AnthonyBebek/WebCrawler```
+2. Run the following command ``` git clone https://github.com/AnthonyBebek/WebsiteGrapher```
 
 3. Run the following commands ```python3 -m pip install flask colorama datetime logging```
 
 4. Install mariaDB from <a href = "https://mariadb.org/download/?t=mariadb&p=mariadb&r=11.3.2">here</a>
 
-5. Create a new file in the WebCrawler directory called ```db_config.py``` and paste in 
+5. Create a new file in the WebsiteGrapher directory called ```db_config.py``` and paste in 
 ```
     db_config = {
     'host': '127.0.0.1',
@@ -180,7 +184,7 @@ To run the server scripts, the client must have python3 installed on the system 
 ``` 
 Make sure to put your replace {MARIADB USERNAME} with your the username you set in the previous step and {MARIADB PASSWORD} with the password
 
-6. Run ```python3 /WebCrawler/URLServer.py```
+6. Run ```python3 /WebsiteGrapher/URLServer.py```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -191,7 +195,7 @@ Make sure to put your replace {MARIADB USERNAME} with your the username you set 
 
 This system is built to be run on a single machine but can also be run on a large network. If you intend to run the clients for a long time, make sure you are running multiple as google might think you are dos attacking their servers, and make you fill out a capta when you go to https://google.com
 
-See the [open issues](https://github.com/AnthonyBebek/WebCrawler/issues) for a full list of proposed features (and known issues).
+See the [open issues](https://github.com/AnthonyBebek/WebsiteGrapher/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -220,22 +224,22 @@ Don't forget to give the project a star! Thanks again!
 Anthony Bebek - ante@viagi.com
 * [![LinkedIn][linkedin-shield]](https://www.linkedin.com/in/anthony-bebek-52b30a2b7/)
 
-Project Link: [https://github.com/AnthonyBebek/WebCrawler](https://github.com/AnthonyBebek/WebCrawler)
+Project Link: [https://github.com/AnthonyBebek/WebsiteGrapher](https://github.com/AnthonyBebek/WebsiteGrapher)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/AnthonyBebek/WebCrawler.svg?style=for-the-badge
-[contributors-url]: https://github.com/AnthonyBebek/WebCrawler/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/AnthonyBebek/WebCrawler.svg?style=for-the-badge
-[forks-url]: https://github.com/AnthonyBebek/WebCrawler/network/members
-[stars-shield]: https://img.shields.io/github/stars/AnthonyBebek/WebCrawler.svg?style=for-the-badge
-[stars-url]: https://github.com/AnthonyBebek/WebCrawler/stargazers
-[issues-shield]: https://img.shields.io/github/issues/AnthonyBebek/WebCrawler.svg?style=for-the-badge
-[issues-url]: https://github.com/AnthonyBebek/WebCrawler/issues
-[license-shield]: https://img.shields.io/github/license/AnthonyBebek/WebCrawler.svg?style=for-the-badge
-[license-url]: https://github.com/AnthonyBebek/WebCrawler/blob/master/LICENSE.txt
+[contributors-shield]: https://img.shields.io/github/contributors/AnthonyBebek/WebsiteGrapher.svg?style=for-the-badge
+[contributors-url]: https://github.com/AnthonyBebek/WebsiteGrapher/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/AnthonyBebek/WebsiteGrapher.svg?style=for-the-badge
+[forks-url]: https://github.com/AnthonyBebek/WebsiteGrapher/network/members
+[stars-shield]: https://img.shields.io/github/stars/AnthonyBebek/WebsiteGrapher.svg?style=for-the-badge
+[stars-url]: https://github.com/AnthonyBebek/WebsiteGrapher/stargazers
+[issues-shield]: https://img.shields.io/github/issues/AnthonyBebek/WebsiteGrapher.svg?style=for-the-badge
+[issues-url]: https://github.com/AnthonyBebek/WebsiteGrapher/issues
+[license-shield]: https://img.shields.io/github/license/AnthonyBebek/WebsiteGrapher.svg?style=for-the-badge
+[license-url]: https://github.com/AnthonyBebek/WebsiteGrapher/blob/master/LICENSE.txt
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/linkedin_username
 [product-screenshot]: images/screenshot.png
