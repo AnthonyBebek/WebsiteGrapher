@@ -1,0 +1,94 @@
+body {  
+    background-color: rgb(200, 198, 198);
+    /*background-image: linear-gradient(to right, #8e2de2, #4a00e0);*/  
+  }
+  .card {
+    background-color:rgba(255, 255, 255, 1);;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.1);
+    transition: 0.3s;
+    width: 100%;
+    border-radius: 5px;
+  }
+  .card2 {
+    background-color:rgba(255, 255, 255, 1);;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.1);
+    transition: 0.3s;
+    width: 100%;
+    border-radius: 5px;
+  }
+  .titlecard {
+    background-color:rgba(255, 255, 255, 1);;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.1);
+    transition: 0.3s;
+    width: 100%;
+    border-radius: 5px;
+    vertical-align: bottom;
+  }
+  
+  .card:hover {
+    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.8);
+  }
+  
+  img {
+    border-radius: 5px 5px 0 0;
+  }
+  
+  .container {
+    padding: 2px 16px;
+  } 
+  h1 { color: #3e3e3e; font-family: 'Raleway',sans-serif; font-size: 20px; font-weight: 800; line-height: 60px; margin: 0 0 24px; text-transform: uppercase; }
+  h2 { color: #0072aa; font-family: 'Raleway',sans-serif; font-size: 20px; font-weight: 800; line-height: 60px; margin: 0 0 24px; }
+  h3 { color: #00a50e; font-family: 'Raleway',sans-serif; font-size: 20px; font-weight: 800; line-height: 60px; margin: 0 0 24px; text-transform: uppercase; }
+  h4 { color: #3e3e3e; font-family: 'Raleway',sans-serif; font-size: 20px; font-weight: 800; line-height: 60px; margin: 0 0 24px; text-transform: uppercase; text-align: center;}
+  h5 { color: #3e3e3e; font-family: 'Raleway',sans-serif; font-size: 20px; font-weight: 800; line-height: 60px; margin: 0 0 24px; text-transform: uppercase;}
+  h1, h2, h3 {
+    width: 50%;
+    height: 60px;
+    margin: 0;
+    padding: 0;
+    display: inline;
+  }
+  
+  .Values {
+    width: 100%;
+    background-color: #16cc8f;
+    color: white;
+    padding: 14px 20px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .Water {
+    width: 100%;
+    background-color: #0eb3e6;
+    color: white;
+    padding: 14px 20px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  #urlTable {
+    /* Add any other styling you need for your table */
+  }
+  
+  #urlTable tr {
+    color: black; /* Default color for rows */
+  }
+  
+  #urlTable tr.outputstatus-0 {
+    color: red !important; /* Color for rows with outputstatusfirst equal to 0 */
+    font-family: 'Raleway', sans-serif !important;
+    font-size: 20px !important;
+}
+
+#urlTable tr.outputstatus-1 {
+    color: green !important; /* Color for rows with outputstatusfirst equal to 1 */
+    font-family: 'Raleway', sans-serif !important;
+    font-size: 20px !important;
+}
+  tr.url-text {
+    font-family: 'Raleway', sans-serif;
+    font-size: 20px;
+  }

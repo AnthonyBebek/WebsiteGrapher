@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+    <link rel="icon" type="image/x-icon" href="{{url_for('static', filename='icon.png')}}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    </head>  
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Logger</title>
+</head>
+<body>
+    <body>
+        <centre><table width = "100%" border = "0" class = "card2" cellpadding = "0" cellspacing = "0">
+          <td>
+                <td width = "100%"><h4>Website Logger<a href="/index">
+        </td>
+        </table></centre>
+      <table width ="100%">
+      <table width="100%" max-width="100%" >
+          <tr valign="top">
+      <td width ="50%" max-width = "100%">
+      <div class="card">
+          <div class="container">
+              <h1>Total Records: </h1><h2 id="Total_Records"></h2>
+              <br>
+              <h1>Unsearched: </h1><h2 id="Unsearched"></h2>
+              <br>
+              <h1>Searched: </h1><h2 id="Searched"></h2>
+              <br>
+              <h1>Percent Searched: </h1><h2 id="Percent"></h2>
+          </div>
+        </div>
+    </td>
+      <td width = "50%" max-width = "100%">
+        <div class="card">
+            <div class="container">
+                <table id="urlTable"></table>
+            </div>
+
+            <script>
+function updateContent() {
+    let sitesValue;
+    $.ajax({
+        url: '/update_content',
+        type: 'GET',
+        success: function(data) {
+            // Update the content dynamically using the received data
+            $('#Total_Records').text(data.total_records);
+            $('#Unsearched').text(data.Unsearched);
+            $('#Searched').text(data.Searched);
+            $('#Percent').text(data.Percent);
+            sitesValue = data.Sites;
+            $('#Sites').text(data.Sites);
+
+            // Split the string inside the success callback
+                // Split the string
+                urlEntries = sitesValue.split(",");
+
+                // Clear the table
+                const table = document.getElementById("urlTable");
+                while (table.firstChild) {
+                    table.removeChild(table.firstChild);
+                }
+
+                // Loop through each URL entry and create a table row with two cells
+                urlEntries.forEach((urlEntry) => {
+                    const [firstNumber, rest] = urlEntry.split('@');
+                    const [outputstatus, url] = rest.split('http');
+                    outputstatusfirst = outputstatus.charAt(0);
+                    const row = table.insertRow();
+
+                    // Create a cell for the first number
+                    //const cell1 = row.insertCell();
+                    //cell1.textContent = firstNumber;
+
+                    // Create a cell for the URL entry
+                    const cell2 = row.insertCell();
+                    cell2.textContent = 'http' + url;
+                    cell2.classList.add('url-text');
+
+                    cell2.style.fontFamily = 'Montserrat, sans-serif';
+                    cell2.style.fontSize = '15px';
+                    cell2.style.textTransform = 'uppercase';
+                    cell2.style.fontWeight = 'bold';
+
+                    // Set the CSS color based on outputstatusfirst value
+                    if (outputstatusfirst === '0') {
+                        row.style.color = '#f54842';
+                    } else if (outputstatusfirst === '1') {
+                        row.style.color = '#00a50e';
+                    }
+                });
+            }
+    });
+}
+
+        updateContent();
+        setInterval(updateContent, 50);
+            </script>
+</body>
+</html>
