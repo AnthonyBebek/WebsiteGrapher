@@ -142,13 +142,17 @@ def main():
             links = get_links(url)
             update_url(url, id)
             update_checked_urls(url)
-            for i in links:
-                update_url(i, id, url)
+            try:
+                for i in links:
+                    update_url(i, id, url)
+            except TypeError:
+                pass
     except KeyboardInterrupt:
         print(f"{checkcode} Sending disconnect packet")
         disconnect(id, url)
         print(f"{checkcode} Quitting")
         exit()
+        
 
 if __name__ == "__main__":
     main()
