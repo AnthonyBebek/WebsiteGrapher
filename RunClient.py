@@ -138,7 +138,6 @@ def disconnect(id, url):
         print(f"{errorcode} No conneciton to server{Fore.WHITE} - {Fore.CYAN}{ServerIP}{Fore.WHITE}")
     except Exception as e:
         print(f"Error: {e}")
-        global id
         id = get_id()
 
 def get_id():

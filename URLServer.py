@@ -11,7 +11,45 @@ init()
 
 ClientCount = 0
 
+StatUpdateInterval = 60
+
 ServerInfo = F"{Fore.WHITE}[{Fore.MAGENTA}Server Info{Fore.WHITE}]{Fore.MAGENTA}"
+
+app = Flask(__name__)
+
+LastServerStatUpdate = time.time()
+
+
+
+def StatChecker():
+    last_checked = time.time()
+
+    while not stop_event.is_set():
+
+        current_time = time.time()
+        if (current_time - last_checked >= StatUpdateInterval) and (Client.GetClientCount() > 0):
+            last_checked = current_time
+            logger.loggingDebug("Updating Stats Table")
+            DB.update_server_stats(Client.GetClientCount())
+            global Web_Logged_Count, Web_Searched_Count, Connected_Clients, Timestamp
+            Web_Logged_Count, Web_Searched_Count, Connected_Clients, Timestamp = DB.get_server_stats()
+
+def ClientCleaner():
+    try:
+        while not stop_event.is_set():
+            clients = Client.GetClients()
+            now = datetime.datetime.now()
+            
+            for client in clients:
+                if (now - client.LastHeartbeat).total_seconds() >= 60:
+                    logger.loggingInfo(f"Killed client: {client.ClientNumber} Last heartbeat was: {(now - client.LastHeartbeat).total_seconds()} ago")
+                    client.ReleaseClientNumber()
+                    #del Client.clients[client.ClientNumber]
+            time.sleep(1)
+    except Exception as e:
+        logger.loggingError(f"Exception in ClientCleaner: {e}")
+
+stop_event = threading.Event()
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -170,11 +208,13 @@ def update_checked_urls_route():
 
 @app.route('/newclient', methods=['GET'])
 def newclient():
-    global ClientCount
-    ClientCount = ClientCount + 1
-    print(f"{ServerInfo} New Client Registered {ClientCount}")
-    response = {'Client': str(ClientCount)}
+    NewClient = Client(datetime.datetime.now(), str(request.remote_addr))
+    ClientList.append(NewClient)
+    response = {'Client': str(NewClient.ClientNumber)}
+    logger.loggingInfo(f"Registered Client: {NewClient.ClientNumber} At: {request.remote_addr}")
+     
     return jsonify(response)
+
 
 @app.route('/disconnect', methods=['POST'])
 def disconnect():
@@ -182,8 +222,18 @@ def disconnect():
     Disconnect_ID = data.get('ID', [])
     Disconnect_Url = data.get('URL', [])
     #DB.update_checked_status(data.get('checked_urls', []))
-    print(f"{ServerInfo} Client {Fore.CYAN}{Disconnect_ID}{Fore.MAGENTA} disconnected, rechecking {Fore.WHITE}{Disconnect_Url}")
+    logger.loggingInfo(f"Clinet {Disconnect_ID} disconnected, rechecking {Disconnect_Url}")
     return "Ok"
+
+@app.route('/reconnect', methods=['POST'])
+def reconnect():
+    data = request.json
+    Client_ID = data.get('client', [])
+    NewClient = Client(datetime.datetime.now(), str(request.remote_addr), str(Client_ID))
+    ClientList.append(NewClient)
+    response = {'Client Restored': str(Client_ID)}
+    return jsonify(response)
+
 
 @app.route('/entries', methods=['GET'])
 def entries():
