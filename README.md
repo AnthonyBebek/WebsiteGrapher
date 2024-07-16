@@ -100,17 +100,17 @@ I have recorded roughly 30,000 websites with this setup and have used only 4 Mib
 
 You can view websites by running ```Graphing.py``` in the terminal. This will show 50 random websites and how they link to eachother
 
-<img src="Readme_Files/Graphing.png" alt="drawing" width="500"/>
+<img src="Readme_Files/Graphing.png" alt="Graphing" width="500"/>
 
 *Note: This will be cleaned up*
 
 By running ```SmartGraphing.py``` you can provide a URL and see what websites link to that URL. 
 
-<img src="Readme_Files/SmartGraphing.png" alt="drawing" width="500"/>
+<img src="Readme_Files/SmartGraphing.png" alt="SmartGraphing" width="500"/>
 
 *Note: This is 50 random websites that reference https://facebook.com, Websites with more than 50 references gives you the option to limit the selection to 50.*
 
-<img src="Readme_Files/website.png" alt="drawing" width="500"/>
+<img src="Readme_Files/Website.png" alt="website" width="500"/>
 
 *Note: Navigate to http://{Server IP}:27016/stats to view the DB stats and any incoming URLs*
 

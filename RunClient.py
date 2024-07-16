@@ -12,6 +12,7 @@ id = 0
 addcode = F"{Fore.WHITE}[{Fore.GREEN}+{Fore.WHITE}]"
 errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]{Fore.RED}"
 checkcode = F"{Fore.WHITE}[{Fore.YELLOW}~{Fore.WHITE}]{Fore.YELLOW}"
+newurl = F"{Fore.WHITE}[{Fore.MAGENTA}~{Fore.WHITE}]{Fore.MAGENTA}"
 
 BeginURL = "https://explodingtopics.com/blog/most-visited-websites"
 
@@ -40,13 +41,8 @@ def get_links(url, timeout=5):
         response = requests.get(url, timeout=timeout)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        links = {
-            f"{parsed_url.scheme}://{'.'.join(parsed_url.netloc.split('.')[-2:])}"
-            for a in soup.find_all('a', href=True)
-            if (parsed_url := urlparse(urljoin(url, a['href']))).scheme in {'http', 'https'} and url not in urljoin(url, a['href'])
-        }
-        return list(links)
+        links = list({urlparse(urljoin(url, a['href'])).scheme + '://' + '.'.join(urlparse(urljoin(url, a['href'])).netloc.split('.')[-2:]) for a in soup.find_all('a', href=True) if url not in urljoin(url, a['href'])})
+        return links
 
     except Timeout as e:
         print(F"{errorcode} Timed Out, skipping!")
@@ -78,9 +74,13 @@ def get_current_url():
         response = requests.get(server_url)
         if response.status_code == 200:
             data = response.json()
-            return data.get('url', 'No URL found')
+            output = data.get('url', 'No URL found')
+            print(f"{newurl} Got new URL: {Fore.WHITE}{output}")
+            return output
         else:
             print(f"Error: {response.status_code} - {response.text}")
+    except ConnectionError:
+        print(f"{errorcode} No conneciton to server{Fore.WHITE} - {Fore.CYAN}{ServerIP}{Fore.WHITE}")
     except Exception as e:
         print(f"Error: {e}")
         global id
@@ -95,6 +95,8 @@ def update_url(new_url, id, old_url = ""):
             print(response.text)
         else:
             print(f"Error: {response.status_code} - {response.text}")
+    except ConnectionError:
+        print(f"{errorcode} No conneciton to server{Fore.WHITE} - {Fore.CYAN}{ServerIP}{Fore.WHITE}")
     except Exception as e:
         print(f"Error: {e}")
         id = get_id()
@@ -106,6 +108,34 @@ def update_checked_urls(checked_urls):
         response = requests.post(server_url, json=payload)
         if response.status_code != 200:
             print(f"Error: {response.status_code} - {response.text}")
+    except ConnectionError:
+        print(f"{errorcode} No conneciton to server{Fore.WHITE} - {Fore.CYAN}{ServerIP}{Fore.WHITE}")
+    except Exception as e:
+        print(f"Error: {e}")
+
+def get_id():
+    server_url = ServerIP + "/newclient"
+    try:
+        response = requests.get(server_url)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('Client', 'No URL found')
+        else:
+            print(f"Error: {response.status_code} - {response.text}")
+    except ConnectionError:
+        print(f"{errorcode} No conneciton to server{Fore.WHITE} - {Fore.CYAN}{ServerIP}{Fore.WHITE}")
+    except Exception as e:
+        print(f"Error: {e}")
+
+def disconnect(id, url):
+    server_url =  ServerIP + "/disconnect"
+    payload = {'ID': id, 'URL': url}
+    try:
+        response = requests.post(server_url, json=payload)
+        if response.status_code != 200:
+            print(f"Error: {response.status_code} - {response.text}")
+    except ConnectionError:
+        print(f"{errorcode} No conneciton to server{Fore.WHITE} - {Fore.CYAN}{ServerIP}{Fore.WHITE}")
     except Exception as e:
         print(f"Error: {e}")
         global id
@@ -125,23 +155,39 @@ def get_id():
         Reconnect(id)
 
 def main():
-    global id
-    id = get_id()
-    print(id)
-    links = get_links(BeginURL)
-    update_url(BeginURL, id)
-    update_checked_urls(BeginURL)
-
-    for i in links:
-        update_url(i, id, BeginURL)
-
-    while True:
-        url = get_current_url()
+    try:
+        id = get_id()
+        if id == None:
+            print(f"{errorcode} No ID supplied!") 
+            print(f"{checkcode} Have you changed the Server IP?{Fore.WHITE} - {Fore.CYAN}{ServerIP}")
+            print()
+            print(f"{errorcode} Quitting{Fore.WHITE}")
+            exit()
+        print(f"{addcode} Client Registered! {Fore.YELLOW}Client ID: {Fore.CYAN}", id, f"{Fore.WHITE}")
+        url = BeginURL
         links = get_links(url)
         update_url(url, id)
         update_checked_urls(url)
+
         for i in links:
             update_url(i, id, url)
+
+        while True:
+            url = get_current_url()
+            links = get_links(url)
+            update_url(url, id)
+            update_checked_urls(url)
+            try:
+                for i in links:
+                    update_url(i, id, url)
+            except TypeError:
+                pass
+    except KeyboardInterrupt:
+        print(f"{checkcode} Sending disconnect packet")
+        disconnect(id, url)
+        print(f"{checkcode} Quitting")
+        exit()
+        
 
 if __name__ == "__main__":
     main()
