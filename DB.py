@@ -1,8 +1,17 @@
+'''
+This script is used as a dependancy for the URLServer.py file, if you are running this program as a client only, then it's safe to delete it
+
+This script stores the URLs in a DB and gets a new link
+'''
+
 import mysql.connector
 import mysql.connector.pooling
 from colorama import init, Fore, Style
 import random
 from db_config import db_config
+import sys
+import logger
+import time
 init()
 
 errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]{Fore.RED}"
@@ -12,7 +21,111 @@ foundcheck = F"{Fore.WHITE}[{Fore.MAGENTA}~{Fore.WHITE}]{Fore.MAGENTA}"
 IDCodeOpen = F"{Fore.WHITE}[{Fore.CYAN}"
 IDCodeClose = F"{Fore.WHITE}]"
 
+def update_server_stats(Clients):
 
+
+    '''
+    Adds a new entry to the stats table.
+
+    Inserts;
+
+    - Websites Logged Count
+    - Websites Searched Count
+    - Currently Connected Clients
+    - Current Time
+    
+    '''
+
+    # Get the current Websites Logged Count
+
+
+    connection = mysql.connector.connect(**db_config)
+    cursor = connection.cursor()
+
+    try:
+        get_curreny_websites_query = "SELECT COUNT(*) FROM sites UNION SELECT COUNT(*) FROM sites WHERE checked = 1;"
+        cursor.execute(get_curreny_websites_query)
+        count_result = cursor.fetchall()
+        if count_result:
+            Web_Logged_Count = count_result[0][0]
+            Web_Searched_Count = count_result[1][0]
+        else:
+            Web_Logged_Count = None
+            Web_Searched_Count = None
+
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+
+    try:
+        update_stats_query = f"INSERT INTO stats (WebLogged, WebSearch, Clients, DATETIME) VALUES ({Web_Logged_Count}, {Web_Searched_Count}, {Clients}, CURTIME())"
+        cursor.execute(update_stats_query)
+        connection.commit()
+
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+    finally:
+        connection.close()
+        cursor.close()
+
+def get_server_stats():
+    '''
+    Returns;
+
+    - Websites Logged Count
+    - Websites Searched Count
+    - Currently Connected Clients
+    - Current Time
+
+    from the stats table in the database
+
+    '''
+
+    connection = mysql.connector.connect(**db_config)
+    cursor = connection.cursor()
+
+    try:
+        get_server_stats_query = "SELECT WebLogged, WebSearch, Clients, DATETIME FROM stats ORDER BY ID DESC LIMIT 12;"
+        cursor.execute(get_server_stats_query)
+        stats_result = cursor.fetchall()
+        #print(stats_result)
+        Web_Logged_Count = []
+        Web_Searched_Count = []
+        Connected_Clients = []
+        timestamp = []
+        if stats_result:
+            for entry in stats_result:
+                Web_Logged_Count.append(entry[0])
+                Web_Searched_Count.append(entry[1])
+                Connected_Clients.append(entry[2])
+                timestamp.append(entry[3])
+        else:
+            Web_Logged_Count = None
+            Web_Searched_Count = None
+            Connected_Clients = None
+            timestamp = None
+
+        Web_Logged_Count.reverse()
+        Web_Searched_Count.reverse()
+        Connected_Clients.reverse()
+        timestamp.reverse()
+
+        Fixed_Timestamps = []
+
+        for time in timestamp:
+            time = str(time)
+            time.replace("datetime.datetime", "")
+            time = time[11:]
+            time = time[:-3]
+            Fixed_Timestamps.append(time)
+        Fixed_Timestamps = list(Fixed_Timestamps)
+
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+
+    return Web_Logged_Count, Web_Searched_Count, Connected_Clients, Fixed_Timestamps 
+
+get_server_stats()
+    
 
 def insert_into_sites(linkurl, url, clientid):
     connection = mysql.connector.connect(**db_config)
@@ -38,7 +151,8 @@ def insert_into_sites(linkurl, url, clientid):
             cursor.execute(update_query, update_data)
             #print(update_query, update_data)
             connection.commit()
-            print(f"{checkcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.YELLOW} URL Found: {url}")
+            #print(f"{checkcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.YELLOW} URL Found: {url}")
+            logger.loggingDebug(f"URL Found: {url}")
             return f"{checkcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.YELLOW} URL Found: {url}", "0-" + url
         else:
             insert_query = "INSERT INTO sites (URL, links) VALUES (%s, %s)"
@@ -46,16 +160,19 @@ def insert_into_sites(linkurl, url, clientid):
 
             cursor.execute(insert_query, insert_data)
             connection.commit()
-            print(f"{addcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.GREEN} Added: {url}")
-            return f"{addcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.GREEN} Added: {url}", "1-" + url
+            #print(f"{addcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.GREEN} Added: {url}")
+            logger.loggingDebug(f"Added: {url}")
+            try:
+                return f"{addcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.GREEN} Added: {url}", "1-" + url
+            except:
+                logger.loggingWarning(f"Missed returning message")
+                return ""
     except mysql.connector.Error as err:
         print(f"Error: {err}")
         return "Null", "Null"
     finally:
         connection.close()
         cursor.close()
-
-
 
 
 def update_checked_status(url):
@@ -71,7 +188,8 @@ def update_checked_status(url):
         #print(f"Checked status updated for URL: {url}")
 
     except mysql.connector.Error as err:
-        print(f"Error: {err}")
+        logger.loggingError(f"Error: {err}")
+        #print(f"Error: {err}")
 
     finally:
         connection.close()
@@ -88,9 +206,11 @@ def get_unchecked_url():
 
         if result:
             unchecked_url = result[0]
-            print(f"{foundcheck} Unchecked URL found: {unchecked_url}")
+            logger.loggingDebug(f"Unchecked URL found: {unchecked_url}")
+            #print(f"{foundcheck} Unchecked URL found: {unchecked_url}")
         else:
-            print(f"{Fore.RED}No unchecked URLs found.")
+            logger.loggingError(f"No unchecked URLs found.")
+            #print(f"{Fore.RED}No unchecked URLs found.")
 
         update_checked_status(result[0])
         connection.commit()
@@ -111,7 +231,8 @@ def get_sites_count():
     if result:
         records_count = result[0]
     else:
-        print(f"{Fore.RED}Unable to retrieve records count.")
+        logger.loggingError(f"Unable to retrieve records count.")
+        #print(f"{Fore.RED}Unable to retrieve records count.")
 
     cursor.close()
     connection.close()
@@ -129,7 +250,8 @@ def get_sites_checked():
     if result:
         checked = result[0]
     else:
-        print(f"{Fore.RED}Unable to retrieve records count.")
+        logger.loggingError(f"Unable to retrieve records count.")
+        #print(f"{Fore.RED}Unable to retrieve records count.")
 
     cursor.close()
     connection.close()
@@ -145,13 +267,14 @@ def get_data(linkurl):
     if link_id_result:
         link_id = link_id_result[0]
     else:
-        print("URL not found in the database.")
+        logger.loggingError(f"URL not found in the database.")
+        #print("URL not found in the database.")
         return None
 
     cursor.execute("DROP TEMPORARY TABLE IF EXISTS temp_links;")
     cursor.execute("CREATE TEMPORARY TABLE temp_links (link_id INT);")
 
-    cursor.execute(f"CALL splitString((SELECT links FROM sites WHERE ID = {link_id}));")
+    cursor.execute(f"CALL splitString((SELECT links FROM sites WHERE ID = {link_id}));", multi=True)
 
     cursor.execute("""
         SELECT URL
@@ -208,7 +331,6 @@ def get_data_simple():
     result = cursor.fetchall()
     
     return result
-
 
 
 # --------------- Example usage -----------------

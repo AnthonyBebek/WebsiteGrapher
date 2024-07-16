@@ -2,16 +2,24 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import DB
 
-input_url = input("Enter a URL to start from: ").strip().lower()
+rows = None
 
-rows = DB.get_data(input_url)
+while rows == None:
+    input_url = input("Enter a URL to start from: ").strip().lower()
+    rows = DB.get_data(input_url)
+    print()
+
 
 if len(rows) > 50:
-    print()
-    result = str(input("There are " + str(len(rows)) + " found websites linked to this website, do you want to limit to the first 50 or continue? (Y/N (Default)): ")).upper()
-    print()
-    if result == "Y":
-        rows = rows[:51]
+    result = None
+    while result != "Y" and result != "N":
+        result = str(input("There are " + str(len(rows)) + " found websites linked to this website, do you want to limit to the first 50 or continue? (Y/N) (Default: Y): ")).upper()
+        print()
+        if result == "Y":
+            rows = rows[:50]
+        elif result == "N":
+            break
+
     
 rows.insert(0, (input_url,)) 
 

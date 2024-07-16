@@ -64,7 +64,7 @@ A flask server runs on the server through port 27016 while the client script can
 <img src="Readme_Files/Server-Client.gif" alt="drawing" width="500"/>
 
 
-The urls are stored on a mysql server hosted on the server with the create script.
+The urls are stored on a mysql server hosted on the server with the create scripts.
 ```
 CREATE TABLE `sites` (
 	`ID` INT(11) NOT NULL AUTO_INCREMENT,
@@ -79,6 +79,19 @@ COLLATE='latin1_swedish_ci'
 ENGINE=InnoDB
 AUTO_INCREMENT=1
 ;
+
+CREATE TABLE `stats` (
+	`ID` INT(11) NOT NULL AUTO_INCREMENT,
+	`WebLogged` INT(11) NULL DEFAULT '0',
+	`WebSearch` INT(11) NULL DEFAULT '0',
+	`Clients` INT(11) NULL DEFAULT '0',
+	`Datetime` DATETIME NULL DEFAULT NULL,
+	PRIMARY KEY (`ID`) USING BTREE
+)
+COLLATE='utf8mb4_general_ci'
+ENGINE=InnoDB
+;
+
 ```
 
 I have recorded roughly 30,000 websites with this setup and have used only 4 Mib of storage data.

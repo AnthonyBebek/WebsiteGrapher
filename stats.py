@@ -48,12 +48,3 @@ def print_database_stats(total_records, Unsearched, Searched):
 
     move_cursor(1, 5)
     print(f"Percent not searched: {Fore.YELLOW}{percent}%{Fore.WHITE}", end='')
-
-if __name__ == "__main__":
-    try:
-        while True:
-            total_records, Unsearched, Searched = get_database_stats()
-            print_database_stats(total_records, Unsearched, Searched)
-            time.sleep(2)
-    except KeyboardInterrupt:
-        a = 1

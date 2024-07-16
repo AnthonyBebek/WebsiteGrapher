@@ -1,22 +1,62 @@
+import logger
 import logging
 import DB
+from ClientHandling import *
 from flask import Flask, jsonify, request, render_template
 from colorama import init, Fore, Style
-import datetime
+from datetime import timedelta
+import threading
+import time
 init()
+
 ClientCount = 0
 
-errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]"
-addcode = F"{Fore.WHITE}[{Fore.GREEN}+{Fore.WHITE}]"
-checkcode = F"{Fore.WHITE}[{Fore.YELLOW}~{Fore.WHITE}]"
-foundcheck = F"{Fore.WHITE}[{Fore.MAGENTA}~{Fore.WHITE}]"
+StatUpdateInterval = 60
+
+ServerInfo = F"{Fore.WHITE}[{Fore.MAGENTA}Server Info{Fore.WHITE}]{Fore.MAGENTA}"
+
+app = Flask(__name__)
+
+LastServerStatUpdate = time.time()
+
+
+
+def StatChecker():
+    last_checked = time.time()
+
+    while not stop_event.is_set():
+
+        current_time = time.time()
+        if (current_time - last_checked >= StatUpdateInterval) and (Client.GetClientCount() > 0):
+            last_checked = current_time
+            logger.loggingDebug("Updating Stats Table")
+            DB.update_server_stats(Client.GetClientCount())
+            global Web_Logged_Count, Web_Searched_Count, Connected_Clients, Timestamp
+            Web_Logged_Count, Web_Searched_Count, Connected_Clients, Timestamp = DB.get_server_stats()
+
+def ClientCleaner():
+    try:
+        while not stop_event.is_set():
+            clients = Client.GetClients()
+            now = datetime.datetime.now()
+            
+            for client in clients:
+                if (now - client.LastHeartbeat).total_seconds() >= 60:
+                    logger.loggingInfo(f"Killed client: {client.ClientNumber} Last heartbeat was: {(now - client.LastHeartbeat).total_seconds()} ago")
+                    client.ReleaseClientNumber()
+                    #del Client.clients[client.ClientNumber]
+            time.sleep(1)
+    except Exception as e:
+        logger.loggingError(f"Exception in ClientCleaner: {e}")
+
+stop_event = threading.Event()
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
-app = Flask(__name__)
-
 Current_Urls = []
+
+ClientList = []
 
 previous_time = datetime.datetime(2024, 4, 5, 12, 0, 0)
 StatValues = [0, 0, 0, 0]
@@ -42,6 +82,75 @@ def UpdateStats():
     return
 
 
+def time_difference(time_str):
+    # Parse the input time string
+    input_time = datetime.datetime.strptime(time_str, "%H:%M").time()
+    
+    # Get the current datetime
+    now = datetime.datetime.now()
+    
+    # Combine the current date with the input time
+    input_datetime = datetime.datetime.combine(now.date(), input_time)
+    
+    # If input time is in the future, adjust to previous day
+    if input_datetime > now:
+        input_datetime -= timedelta(days=1)
+    
+    # Calculate the time difference
+    time_diff = now - input_datetime
+    
+    # Convert the time difference to a string representation
+    days, seconds = time_diff.days, time_diff.seconds
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    seconds = seconds % 60
+    
+    if days > 0:
+        if minutes == 1:
+            return f"Updated 1 day ago"
+        return f"Updated {minutes} days ago"
+    elif hours > 0:
+        if minutes == 1:
+            return f"Updated 1 hour ago"
+        return f"Updated {minutes} hours ago"
+    elif minutes > 0:
+        if minutes == 1:
+            return f"Updated 1 minute ago"
+        return f"Updated {minutes} minutes ago"
+    else:
+        if seconds == 1:
+            return f"Updated 1 second ago"
+        return f"Updated {seconds} seconds ago"
+
+# Dynamic Website Data
+
+Web_Logged_Count = 0
+Web_Searched_Count = []
+Connected_Clients = []
+Timestamp = []
+
+Web_Logged_Count, Web_Searched_Count, Connected_Clients, Timestamp = DB.get_server_stats()
+
+def timelabels():
+    return ''.join(str(Timestamp))
+
+def websites_logged():
+    return Web_Logged_Count
+
+def websites_searched():
+    return Web_Searched_Count
+
+def clients_connected():
+    return Connected_Clients
+
+def serverStats():
+    serverStatInfo = [Connected_Clients[11], Web_Logged_Count[11], Web_Searched_Count[11], round((Web_Searched_Count[11] - Web_Searched_Count[10]) / (StatUpdateInterval / 60), 2)]
+    return serverStatInfo
+
+def getUpdateTimers():
+    
+    updateTimerData = [time_difference(Timestamp[11]), time_difference(Timestamp[11]), time_difference(Timestamp[11])]
+    return updateTimerData
 
 
 class URLManager:
@@ -57,7 +166,6 @@ class URLManager:
 
 url_manager = URLManager()
 
-
 @app.route('/query', methods=['GET'])
 def query():
     url = DB.get_unchecked_url()
@@ -72,16 +180,22 @@ def update():
     url = data.get('url', '')
     old_url = data.get('old_url', '')
     client_id = data.get('Client', '')
-
+    client = Client.GetClient(str(client_id))
+    if client == None:
+        logger.loggingWarning(f"Client '{client_id}' does not exsist!")
+        return ""
+    client.UpdateHeartbeat()
     Current_Urls.insert(0, url)
 
     if len(Current_Urls) > 14:
         Current_Urls.pop()
+    try:    
+        output, output2 = DB.insert_into_sites(old_url, url, client_id)
+        url_manager.add_entry(output2, client_id)
 
-    output, output2 = DB.insert_into_sites(old_url, url, client_id)
-    url_manager.add_entry(output2, client_id)
-
-    return output
+        return output
+    except:
+        return ""
 
 @app.route('/update_checked_urls', methods=['POST'])
 def update_checked_urls_route():
@@ -94,11 +208,32 @@ def update_checked_urls_route():
 
 @app.route('/newclient', methods=['GET'])
 def newclient():
-    global ClientCount
-    ClientCount = ClientCount + 1
-    response = {'Client': str(ClientCount)}
-    #return str(ClientCount)
+    NewClient = Client(datetime.datetime.now(), str(request.remote_addr))
+    ClientList.append(NewClient)
+    response = {'Client': str(NewClient.ClientNumber)}
+    logger.loggingInfo(f"Registered Client: {NewClient.ClientNumber} At: {request.remote_addr}")
+     
     return jsonify(response)
+
+
+@app.route('/disconnect', methods=['POST'])
+def disconnect():
+    data = request.json
+    Disconnect_ID = data.get('ID', [])
+    Disconnect_Url = data.get('URL', [])
+    #DB.update_checked_status(data.get('checked_urls', []))
+    logger.loggingInfo(f"Clinet {Disconnect_ID} disconnected, rechecking {Disconnect_Url}")
+    return "Ok"
+
+@app.route('/reconnect', methods=['POST'])
+def reconnect():
+    data = request.json
+    Client_ID = data.get('client', [])
+    NewClient = Client(datetime.datetime.now(), str(request.remote_addr), str(Client_ID))
+    ClientList.append(NewClient)
+    response = {'Client Restored': str(Client_ID)}
+    return jsonify(response)
+
 
 @app.route('/entries', methods=['GET'])
 def entries():
@@ -111,6 +246,10 @@ def stats():
     Searched = int(total_records) - int(Unsearched)
 
     return render_template('stats.html')
+
+@app.route('/')
+def index():
+    return render_template('index.html')
     
 @app.route('/Total_Records')
 def Total_Records():
@@ -140,7 +279,54 @@ def Total_Clients():
 def Urls():
     return Current_Urls
 
+# Ajax data out
 
+@app.route('/timelabels/') 
+def api_get_timelabels(): 
+    return timelabels()
+
+@app.route('/websites-logged-data/') 
+def api_get_websites_logged(): 
+    return websites_logged()
+
+@app.route('/websites-searched-data/') 
+def api_get_websites_searched(): 
+    return websites_searched()
+
+@app.route('/clients-connected-data/') 
+def api_get_clients_connected(): 
+    return clients_connected()
+
+@app.route('/server-statistics/') 
+def api_get_server_statistics(): 
+    return serverStats()
+
+@app.route('/update-timers/')
+def api_get_update_timers():
+    return getUpdateTimers()
+
+
+def run_flask():
+    app.run(host='0.0.0.0', port=27016)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=27016)
+    background_thread = threading.Thread(target=ClientCleaner)
+    background_thread.start()
+
+    Server_thread = threading.Thread(target=StatChecker)
+    Server_thread.start()
+
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.start()
+
+    try:
+        while True:
+            time.sleep(0.1)
+    except KeyboardInterrupt:
+        print("Closing Server")
+        stop_event.set()
+        background_thread.join()
+        Server_thread.join()
+        import os
+        os._exit(0)
+

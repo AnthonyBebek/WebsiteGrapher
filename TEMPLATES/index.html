@@ -1,0 +1,465 @@
+<link id="pagestyle" href="/static/assets/css/material-dashboard.css?v=3.0.0" rel="stylesheet" />
+<link href="/static/assets/css/nucleo-icons.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <br>
+    <br>
+    <div class="container-fluid py-4">
+      <div class="row">
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+          <div class="card">
+            <div class="card-header p-3 pt-2">
+              <div class="icon icon-lg icon-shape bg-gradient-dark shadow-dark text-center border-radius-xl mt-n4 position-absolute">
+                <i class="material-icons opacity-10">person</i>
+              </div>
+              <div class="text-end pt-1">
+                <p class="text-sm mb-0 text-capitalize">Clients Connected</p>
+                <h4 class="mb-0" id="ClientsConnected"></h4>
+              </div>
+            </div>
+            <div class="card-footer p-3">
+              <p class="mb-0"><span class="text-success text-sm font-weight-bolder"></span></p></div>
+          </div>
+        </div>
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+          <div class="card">
+            <div class="card-header p-3 pt-2">
+              <div class="icon icon-lg icon-shape bg-gradient-primary shadow-primary text-center border-radius-xl mt-n4 position-absolute">
+                <i class="material-icons opacity-10">storage</i>
+              </div>
+              <div class="text-end pt-1">
+                <p class="text-sm mb-0 text-capitalize">Websites Logged</p>
+                <h4 class="mb-0" id="Websites-Logged"></h4>
+              </div>
+            </div>
+            <div class="card-footer p-3">
+              <p class="mb-0"><span class="text-success text-sm font-weight-bolder"></span></p></div>
+          </div>
+        </div>
+        <div class="col-xl-3 col-sm-6 mb-xl-0 mb-4">
+          <div class="card">
+            <div class="card-header p-3 pt-2">
+              <div class="icon icon-lg icon-shape bg-gradient-success shadow-success text-center border-radius-xl mt-n4 position-absolute">
+                <i class="material-icons opacity-10">storage</i>
+              </div>
+              <div class="text-end pt-1">
+                <p class="text-sm mb-0 text-capitalize">Websites Searched</p>
+                <h4 class="mb-0" id="WebsitesSearched"></h4>
+              </div>
+            </div>
+            <div class="card-footer p-3">
+              <p class="mb-0"><span class="text-success text-sm font-weight-bolder"></span></p></div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-sm-6">
+          <div class="card">
+            <div class="card-header p-3 pt-2">
+              <div class="icon icon-lg icon-shape bg-gradient-info shadow-info text-center border-radius-xl mt-n4 position-absolute">
+                <i class="material-icons opacity-10">speed</i>
+              </div>
+              <div class="text-end pt-1">
+                <p class="text-sm mb-0 text-capitalize">Websites Per Minute</p>
+                <h4 class="mb-0" id="WebsitesPerMinute"></h4>
+              </div>
+            </div>
+            <div class="card-footer p-3">
+              <p class="mb-0"><span class="text-success text-sm font-weight-bolder"></span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row mt-4">
+        <div class="col-lg-4 col-md-6 mt-4 mb-4">
+          <div class="card z-index-2 ">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2 bg-transparent">
+              <div class="bg-gradient-primary shadow-primary border-radius-lg py-3 pe-1">
+                <div class="chart">
+                  <canvas id="chart-websites-logged" class="chart-canvas" height="170"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="card-body">
+              <h6 class="mb-0 ">Websites Logged</h6>
+              <p class="text-sm ">Websites already logged into the database.</p>
+              <hr class="dark horizontal">
+              <div class="d-flex ">
+                <i class="material-icons text-sm my-auto me-1">schedule</i>
+                <p class="mb-0 text-sm" id="WebsitesLoggedTimer"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4 col-md-6 mt-4 mb-4">
+          <div class="card z-index-2  ">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2 bg-transparent">
+              <div class="bg-gradient-success shadow-success border-radius-lg py-3 pe-1">
+                <div class="chart">
+                  <canvas id="chart-websites-searched" class="chart-canvas" height="170"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="card-body">
+              <h6 class="mb-0 "> Websites Searched </h6>
+              <p class="text-sm ">Websites that have been completely searched.</p>
+              <hr class="dark horizontal">
+              <div class="d-flex ">
+                <i class="material-icons text-sm my-auto me-1">schedule</i>
+                <p class="mb-0 text-sm" id="WebsitesSearchedTimer"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-4 mt-4 mb-3">
+          <div class="card z-index-2 ">
+            <div class="card-header p-0 position-relative mt-n4 mx-3 z-index-2 bg-transparent">
+              <div class="bg-gradient-dark shadow-dark border-radius-lg py-3 pe-1">
+                <div class="chart">
+                  <canvas id="chart-clients-connected" class="chart-canvas" height="170"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="card-body">
+              <h6 class="mb-0 "> Clients Connected </h6>
+              <p class="text-sm ">Clients currently connected to the network.</p>
+              <hr class="dark horizontal">
+              <div class="d-flex ">
+                <i class="material-icons text-sm my-auto me-1">schedule</i>
+                <p class="mb-0 text-sm" id="ClientsConnectedTimer"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+<!-- Specific Page JS goes HERE  -->
+
+  <script src="/static/assets/js/chartjs.min.js"></script>
+  <script>
+
+
+  // Ajax for getting timelables used in graphing
+  $.ajax({
+      type: "GET",
+      url: "/timelabels/",
+      async: false,
+      success: function(res){
+          dirtylabels = res.split(',');
+          timelabels = dirtylabels.map(item => item.replace(/['\[\]]/g, ''));
+        console.log("Timelable data: ", timelabels);                     
+      }
+    });
+
+
+  // Ajax for getting websites logged data
+  $.ajax({
+      type: "GET",
+      url: "/websites-logged-data/",
+      async: false,
+      success: function(res){
+        WebsitesLoggedData = res;
+        console.log("Website Log Data: ", WebsitesLoggedData);                     
+      }
+  });
+
+  // Ajax for getting websites searched data
+  $.ajax({
+      type: "GET",
+      url: "/websites-searched-data/",
+      async: false,
+      success: function(res){
+          WebsitesSearchedData = res;
+        console.log("Website Search Data: ", WebsitesSearchedData);                     
+      }
+  });
+
+  // Ajax for getting clients connected data
+  $.ajax({
+      type: "GET",
+      url: "/clients-connected-data/",
+      async: false,
+      success: function(res){
+          ClientsConnectedData = res;
+        console.log("Client Connect Data: ", ClientsConnectedData);                     
+      }
+  });
+
+  // Ajax for getting server statistics
+  $.ajax({
+      type: "GET",
+      url: "/server-statistics/",
+      async: false,
+      success: function(res){
+          ServerStatisticData = res;
+        console.log("Server Statistics Data: ", ServerStatisticData);    
+        document.getElementById('ClientsConnected').innerHTML = ServerStatisticData[0];                 
+        document.getElementById('Websites-Logged').innerHTML = ServerStatisticData[1];
+        document.getElementById('WebsitesSearched').innerHTML = ServerStatisticData[2];
+        document.getElementById('WebsitesPerMinute').innerHTML = ServerStatisticData[3];
+      }
+  });
+
+  // Ajax for getting update timers
+  $.ajax({
+      type: "GET",
+      url: "/update-timers/",
+      async: false,
+      success: function(res){
+          ServerStatisticData = res;
+        console.log("Update Timer Data: ", ServerStatisticData);    
+        document.getElementById('WebsitesLoggedTimer').innerHTML = ServerStatisticData[0];                 
+        document.getElementById('WebsitesSearchedTimer').innerHTML = ServerStatisticData[1];
+        document.getElementById('ClientsConnectedTimer').innerHTML = ServerStatisticData[2];
+      }
+  });
+
+  
+
+    var ctx = document.getElementById("chart-websites-logged").getContext("2d");
+
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: timelabels,
+        datasets: [{
+          label: "Websites",
+          tension: 0,
+          borderWidth: 0,
+          pointRadius: 5,
+          pointBackgroundColor: "rgba(255, 255, 255, .8)",
+          pointBorderColor: "transparent",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderWidth: 4,
+          backgroundColor: "transparent",
+          fill: true,
+          data: WebsitesLoggedData,
+          maxBarThickness: 6
+
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          }
+        },
+        interaction: {
+          intersect: false,
+          mode: 'index',
+        },
+        scales: {
+          y: {
+            grid: {
+              drawBorder: false,
+              display: true,
+              drawOnChartArea: true,
+              drawTicks: false,
+              borderDash: [5, 5],
+              color: 'rgba(255, 255, 255, .2)'
+            },
+            ticks: {
+              display: true,
+              color: '#f8f9fa',
+              padding: 10,
+              font: {
+                size: 14,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
+            }
+          },
+          x: {
+            grid: {
+              drawBorder: false,
+              display: false,
+              drawOnChartArea: false,
+              drawTicks: false,
+              borderDash: [5, 5]
+            },
+            ticks: {
+              display: true,
+              color: '#f8f9fa',
+              padding: 10,
+              font: {
+                size: 14,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
+            }
+          },
+        },
+      },
+    });
+
+
+    var ctx2 = document.getElementById("chart-websites-searched").getContext("2d");
+
+    new Chart(ctx2, {
+      type: "line",
+      data: {
+        labels: timelabels,
+        datasets: [{
+          label: "Websites",
+          tension: 0,
+          borderWidth: 0,
+          pointRadius: 5,
+          pointBackgroundColor: "rgba(255, 255, 255, .8)",
+          pointBorderColor: "transparent",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderWidth: 4,
+          backgroundColor: "transparent",
+          fill: true,
+          data: WebsitesSearchedData,
+          maxBarThickness: 6
+
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          }
+        },
+        interaction: {
+          intersect: false,
+          mode: 'index',
+        },
+        scales: {
+          y: {
+            grid: {
+              drawBorder: false,
+              display: true,
+              drawOnChartArea: true,
+              drawTicks: false,
+              borderDash: [5, 5],
+              color: 'rgba(255, 255, 255, .2)'
+            },
+            ticks: {
+              display: true,
+              color: '#f8f9fa',
+              padding: 10,
+              font: {
+                size: 14,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
+            }
+          },
+          x: {
+            grid: {
+              drawBorder: false,
+              display: false,
+              drawOnChartArea: false,
+              drawTicks: false,
+              borderDash: [5, 5]
+            },
+            ticks: {
+              display: true,
+              color: '#f8f9fa',
+              padding: 10,
+              font: {
+                size: 14,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
+            }
+          },
+        },
+      },
+    });
+
+    var ctx3 = document.getElementById("chart-clients-connected").getContext("2d");
+
+    new Chart(ctx3, {
+      type: "line",
+      data: {
+        labels: timelabels,
+        datasets: [{
+          label: "Concurrent Clients",
+          tension: 0,
+          borderWidth: 0,
+          pointRadius: 5,
+          pointBackgroundColor: "rgba(255, 255, 255, .8)",
+          pointBorderColor: "transparent",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderWidth: 4,
+          backgroundColor: "transparent",
+          fill: true,
+          data: ClientsConnectedData,
+          maxBarThickness: 6
+
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          }
+        },
+        interaction: {
+          intersect: false,
+          mode: 'index',
+        },
+        scales: {
+          y: {
+            grid: {
+              drawBorder: false,
+              display: true,
+              drawOnChartArea: true,
+              drawTicks: false,
+              borderDash: [5, 5],
+              color: 'rgba(255, 255, 255, .2)'
+            },
+            ticks: {
+              display: true,
+              padding: 10,
+              color: '#f8f9fa',
+              font: {
+                size: 14,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
+            }
+          },
+          x: {
+            grid: {
+              drawBorder: false,
+              display: false,
+              drawOnChartArea: false,
+              drawTicks: false,
+              borderDash: [5, 5]
+            },
+            ticks: {
+              display: true,
+              color: '#f8f9fa',
+              padding: 10,
+              font: {
+                size: 14,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
+            }
+          },
+        },
+      },
+    });
+  </script>
