@@ -16,7 +16,7 @@ newurl = F"{Fore.WHITE}[{Fore.MAGENTA}~{Fore.WHITE}]{Fore.MAGENTA}"
 
 BeginURL = "https://explodingtopics.com/blog/most-visited-websites"
 
-ServerIP = "http://192.168.30.77:27016"
+ServerIP = "http://127.0.0.1:27016"
 
 # The server has rebooted, so reautorize yourself with your old ID
 def Reconnect(id):

@@ -8,11 +8,93 @@ import mysql.connector
 import mysql.connector.pooling
 from colorama import init, Fore, Style
 import random
-from db_config import db_config
 import sys
 import logger
 import time
+import sqlite3
+import os
+
 init()
+
+
+def connect_to_db():
+    if os.path.exists('./db_config.py'):
+        from db_config import db_config
+        db_type = 'mysql'
+    else:
+        db_type = 'sqlite'
+        sqlite_file = "database.sqlite"
+        if not os.path.exists(sqlite_file):
+            logger.loggingWarning("DB connection file not found, using SQLite")
+            open(sqlite_file, 'w').close()
+        db_config = {'db_file': sqlite_file}
+    return db_type, db_config
+
+def create_tables_if_not_exist(connection):
+    create_sites_table = """
+    CREATE TABLE IF NOT EXISTS sites (
+        ID INTEGER PRIMARY KEY AUTOINCREMENT,
+        Ref INTEGER DEFAULT 1,
+        Links TEXT DEFAULT '0',
+        Checked INTEGER DEFAULT 0,
+        URL TEXT NOT NULL
+    );
+    """
+    create_stats_table = """
+    CREATE TABLE IF NOT EXISTS stats (
+        ID INTEGER PRIMARY KEY AUTOINCREMENT,
+        WebLogged INTEGER DEFAULT 0,
+        WebSearch INTEGER DEFAULT 0,
+        Clients INTEGER DEFAULT 0,
+        Datetime DATETIME DEFAULT NULL
+    );
+    """
+    cursor = connection.cursor()
+    cursor.execute(create_sites_table)
+    cursor.execute(create_stats_table)
+    connection.commit()
+
+def connect(db_type, db_config):
+    if db_type == 'mysql':
+        connection = mysql.connector.connect(
+        host=db_config['host'],
+        user=db_config['user'],
+        password=db_config['password'],
+        database=db_config['database']
+    )  
+    elif db_type == "sqlite":
+        connection = sqlite3.connect(db_config['db_file'], check_same_thread=False)
+        create_tables_if_not_exist(connection)
+    else:
+        logger.loggingError("Unsupported database type!")
+        quit()
+    return connection
+
+def execute_query(connection, query, params=None, commit=False):
+
+    if db_type == 'sqlite':
+        query = query.replace('%s', '?')
+        query = query.replace('CURTIME()', "time('now')")
+        query = query.replace('CURRENT_TIMESTAMP', "datetime('now')")
+        query = query.replace('RAND()', "RANDOM()")
+
+    cursor = connection.cursor()
+    cursor.execute(query, params or ())
+    if commit:
+        connection.commit()
+    return cursor
+
+def fetchall(cursor):
+    return cursor.fetchall()
+
+def fetchone(cursor):
+    return cursor.fetchone()
+
+def close_connection(connection):
+    connection.close()
+
+db_type, db_config = connect_to_db()
+connection = connect(db_type, db_config)
 
 errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]{Fore.RED}"
 addcode = F"{Fore.WHITE}[{Fore.GREEN}+{Fore.WHITE}]{Fore.GREEN}"
@@ -39,13 +121,10 @@ def update_server_stats(Clients):
     # Get the current Websites Logged Count
 
 
-    connection = mysql.connector.connect(**db_config)
-    cursor = connection.cursor()
-
     try:
         get_curreny_websites_query = "SELECT COUNT(*) FROM sites UNION SELECT COUNT(*) FROM sites WHERE checked = 1;"
-        cursor.execute(get_curreny_websites_query)
-        count_result = cursor.fetchall()
+        cursor = execute_query(connection, get_curreny_websites_query)
+        count_result = fetchall(cursor)
         if count_result:
             Web_Logged_Count = count_result[0][0]
             Web_Searched_Count = count_result[1][0]
@@ -58,14 +137,10 @@ def update_server_stats(Clients):
 
     try:
         update_stats_query = f"INSERT INTO stats (WebLogged, WebSearch, Clients, DATETIME) VALUES ({Web_Logged_Count}, {Web_Searched_Count}, {Clients}, CURTIME())"
-        cursor.execute(update_stats_query)
-        connection.commit()
+        cursor = execute_query(connection, update_stats_query, commit = True)
 
     except mysql.connector.Error as err:
         print(f"Error: {err}")
-    finally:
-        connection.close()
-        cursor.close()
 
 def get_server_stats():
     '''
@@ -80,19 +155,16 @@ def get_server_stats():
 
     '''
 
-    connection = mysql.connector.connect(**db_config)
-    cursor = connection.cursor()
-
     try:
         get_server_stats_query = "SELECT WebLogged, WebSearch, Clients, DATETIME FROM stats ORDER BY ID DESC LIMIT 12;"
-        cursor.execute(get_server_stats_query)
-        stats_result = cursor.fetchall()
+        cursor = execute_query(connection, get_server_stats_query)
+        stats_result = fetchall(cursor)
         #print(stats_result)
         Web_Logged_Count = []
         Web_Searched_Count = []
         Connected_Clients = []
         timestamp = []
-        if stats_result:
+        if not stats_result == None:
             for entry in stats_result:
                 Web_Logged_Count.append(entry[0])
                 Web_Searched_Count.append(entry[1])
@@ -128,29 +200,26 @@ get_server_stats()
     
 
 def insert_into_sites(linkurl, url, clientid):
-    connection = mysql.connector.connect(**db_config)
-    cursor = connection.cursor()
 
     try:
         get_id_query = "SELECT ID FROM sites WHERE URL = %s"
-        cursor.execute(get_id_query, (linkurl,))
-        link_id_result = cursor.fetchone()
+        cursor = execute_query(connection, get_id_query, (linkurl,))
+        link_id_result = fetchall(cursor)
         if link_id_result:
             link_id = link_id_result[0]
         else:
             link_id = None
 
         check_query = "SELECT COUNT(*) FROM sites WHERE URL = %s"
-        cursor.execute(check_query, (url,))
-        count = cursor.fetchone()[0]
+        cursor = execute_query(connection, check_query, (url,))
+        count = fetchone(cursor)[0]
 
         if count > 0:
             update_query = "UPDATE sites SET Ref = Ref + 1, links = CONCAT(COALESCE(links, ''), %s) WHERE URL = %s"
             update_data = (f',{link_id}' if link_id else '', url)
 
-            cursor.execute(update_query, update_data)
+            cursor = execute_query(connection, update_query, update_data, commit=True)
             #print(update_query, update_data)
-            connection.commit()
             #print(f"{checkcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.YELLOW} URL Found: {url}")
             logger.loggingDebug(f"URL Found: {url}")
             return f"{checkcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.YELLOW} URL Found: {url}", "0-" + url
@@ -158,8 +227,7 @@ def insert_into_sites(linkurl, url, clientid):
             insert_query = "INSERT INTO sites (URL, links) VALUES (%s, %s)"
             insert_data = (url, str(link_id) if link_id else None)
 
-            cursor.execute(insert_query, insert_data)
-            connection.commit()
+            cursor = execute_query(connection, insert_query, insert_data, commit=True)
             #print(f"{addcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.GREEN} Added: {url}")
             logger.loggingDebug(f"Added: {url}")
             try:
@@ -170,20 +238,13 @@ def insert_into_sites(linkurl, url, clientid):
     except mysql.connector.Error as err:
         print(f"Error: {err}")
         return "Null", "Null"
-    finally:
-        connection.close()
-        cursor.close()
 
 
 def update_checked_status(url):
-    connection = mysql.connector.connect(**db_config)
-    cursor = connection.cursor()
-
     update_query = "UPDATE sites SET checked = 1 WHERE url = %s"
 
     try:
-        cursor.execute(update_query, (url,))
-        connection.commit()
+        execute_query(connection, update_query, (url,), commit=True)
 
         #print(f"Checked status updated for URL: {url}")
 
@@ -191,18 +252,12 @@ def update_checked_status(url):
         logger.loggingError(f"Error: {err}")
         #print(f"Error: {err}")
 
-    finally:
-        connection.close()
-        cursor.close()
-
 def get_unchecked_url():
-    connection = mysql.connector.connect(**db_config)
-    cursor = connection.cursor()
 
     try:
         select_query = "SELECT URL FROM sites WHERE checked = 0 ORDER BY RAND() LIMIT 1"
-        cursor.execute(select_query)
-        result = cursor.fetchone()
+        cursor = execute_query(connection, select_query)
+        result = fetchone(cursor)
 
         if result:
             unchecked_url = result[0]
@@ -213,20 +268,16 @@ def get_unchecked_url():
             #print(f"{Fore.RED}No unchecked URLs found.")
 
         update_checked_status(result[0])
-        connection.commit()
         return result[0] if result else None
-
-    finally:
-        connection.close()
-        cursor.close()
+    
+    except:
+        logger.loggingError("Error found in get_unchecked_url()")
 
 def get_sites_count():
-    connection = mysql.connector.connect(**db_config)
-    cursor = connection.cursor()
 
     count_query = "SELECT COUNT(*) FROM sites"
-    cursor.execute(count_query)
-    result = cursor.fetchone()
+    cursor = execute_query(connection, count_query)
+    result = fetchone(cursor)
     
     if result:
         records_count = result[0]
@@ -234,18 +285,14 @@ def get_sites_count():
         logger.loggingError(f"Unable to retrieve records count.")
         #print(f"{Fore.RED}Unable to retrieve records count.")
 
-    cursor.close()
-    connection.close()
     return str(records_count) if result else None
 
 
 def get_sites_checked():
-    connection = mysql.connector.connect(**db_config)
-    cursor = connection.cursor()
 
     count_query = "SELECT COUNT(*) FROM sites WHERE checked = 0;"
-    cursor.execute(count_query)
-    result = cursor.fetchone()
+    cursor = execute_query(connection, count_query)
+    result = fetchone(cursor)
     
     if result:
         checked = result[0]
@@ -253,17 +300,13 @@ def get_sites_checked():
         logger.loggingError(f"Unable to retrieve records count.")
         #print(f"{Fore.RED}Unable to retrieve records count.")
 
-    cursor.close()
-    connection.close()
     return str(checked) if result else None
 
 def get_data(linkurl):
-    connection = mysql.connector.connect(**db_config)
-    cursor = connection.cursor()
 
     get_id_query = "SELECT ID FROM sites WHERE URL = %s"
-    cursor.execute(get_id_query, (linkurl,))
-    link_id_result = cursor.fetchone()
+    cursor = execute_query(connection, get_id_query, (linkurl,))
+    link_id_result = fetchone(cursor)
     if link_id_result:
         link_id = link_id_result[0]
     else:
@@ -271,12 +314,12 @@ def get_data(linkurl):
         #print("URL not found in the database.")
         return None
 
-    cursor.execute("DROP TEMPORARY TABLE IF EXISTS temp_links;")
-    cursor.execute("CREATE TEMPORARY TABLE temp_links (link_id INT);")
+    execute_query(connection, "DROP TEMPORARY TABLE IF EXISTS temp_links;")
+    execute_query(connection, "CREATE TEMPORARY TABLE temp_links (link_id INT);")
 
-    cursor.execute(f"CALL splitString((SELECT links FROM sites WHERE ID = {link_id}));", multi=True)
+    execute_query(connection, f"CALL splitString((SELECT links FROM sites WHERE ID = {link_id}));", multi=True)
 
-    cursor.execute("""
+    execute_query(connection, """
         SELECT URL
         FROM sites
         WHERE ID IN (
@@ -285,9 +328,9 @@ def get_data(linkurl):
         );
     """)
 
-    result = cursor.fetchall()
+    result = fetchall(cursor)
 
-    cursor.execute("DROP TEMPORARY TABLE IF EXISTS temp_links;")
+    execute_query(connection, "DROP TEMPORARY TABLE IF EXISTS temp_links;")
 
     return result
 
@@ -323,12 +366,10 @@ DELIMITER ;
 
 
 def get_data_simple():
-    connection = mysql.connector.connect(**db_config)
-    cursor = connection.cursor()
 
     count_query = "SELECT ID, URL, Links FROM sites LIMIT 50"
-    cursor.execute(count_query)
-    result = cursor.fetchall()
+    cursor = execute_query(connection, count_query)
+    result = fetchall(cursor)
     
     return result
 
