@@ -16,18 +16,26 @@ import os
 
 init()
 
+SuppressWarnings = False
+
 
 def connect_to_db():
     if os.path.exists('./db_config.py'):
         from db_config import db_config
         db_type = 'mysql'
+        logger.loggingInfo("Using external MYSQL Server")
     else:
         db_type = 'sqlite'
-        sqlite_file = "database.sqlite"
+        sqlite_file = "websites.sqlite"
+        logger.loggingInfo("Using SQLite DB")
         if not os.path.exists(sqlite_file):
-            logger.loggingWarning("DB connection file not found, using SQLite")
+            logger.loggingWarning("SQLite file not found, creating new database")
             open(sqlite_file, 'w').close()
         db_config = {'db_file': sqlite_file}
+        if SuppressWarnings == False:
+            logger.loggingWarning('Using SQLite as DB, this is not recommended for servers with more than 10,000 sites')
+        else:
+            print("Ok")
     return db_type, db_config
 
 def create_tables_if_not_exist(connection):
@@ -60,7 +68,7 @@ def connect(db_type, db_config):
         host=db_config['host'],
         user=db_config['user'],
         password=db_config['password'],
-        database=db_config['database']
+        database=db_config['websites']
     )  
     elif db_type == "sqlite":
         connection = sqlite3.connect(db_config['db_file'], check_same_thread=False)
@@ -93,8 +101,14 @@ def fetchone(cursor):
 def close_connection(connection):
     connection.close()
 
-db_type, db_config = connect_to_db()
-connection = connect(db_type, db_config)
+db_type, db_config, connection = None, None, None
+
+def start_db():
+    global connection
+    global db_type
+    global db_config
+    db_type, db_config = connect_to_db()
+    connection = connect(db_type, db_config)
 
 errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]{Fore.RED}"
 addcode = F"{Fore.WHITE}[{Fore.GREEN}+{Fore.WHITE}]{Fore.GREEN}"
@@ -195,8 +209,6 @@ def get_server_stats():
         print(f"Error: {err}")
 
     return Web_Logged_Count, Web_Searched_Count, Connected_Clients, Fixed_Timestamps 
-
-get_server_stats()
     
 
 def insert_into_sites(linkurl, url, clientid):

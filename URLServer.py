@@ -1,6 +1,7 @@
 import logger
 import logging
 import DB
+import argparse
 from ClientHandling import *
 from flask import Flask, jsonify, request, render_template
 from colorama import init, Fore, Style
@@ -17,9 +18,17 @@ ServerInfo = F"{Fore.WHITE}[{Fore.MAGENTA}Server Info{Fore.WHITE}]{Fore.MAGENTA}
 
 app = Flask(__name__)
 
+parser = argparse.ArgumentParser(description="Options:")
+
+parser.add_argument('--suppressWarn', action='store_true', help='Suppress warning messages (Only use this if you really know what you are doing!)')
+args = parser.parse_args()
+
+DB.SuppressWarnings = args.suppressWarn
+
 LastServerStatUpdate = time.time()
 
-
+DB.start_db()
+DB.get_server_stats()
 
 def StatChecker():
     last_checked = time.time()
