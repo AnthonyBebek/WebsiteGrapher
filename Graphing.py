@@ -3,6 +3,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import DB
 
+DB.start_db()
+
 rows = DB.get_data_simple()
 
 G = nx.Graph()

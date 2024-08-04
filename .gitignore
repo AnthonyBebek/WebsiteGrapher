@@ -3,3 +3,4 @@ db_config.py
 __pycache__
 *.pyc
 *.sqlite
+.dockerignore

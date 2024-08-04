@@ -81,6 +81,14 @@ def connect(db_type, db_config):
 def execute_query(connection, query, params=None, commit=False):
 
     if db_type == 'sqlite':
+        if 'CONCAT' in query:
+            while 'CONCAT' in query:
+                start = query.index('CONCAT')
+                end = query.index(')', start) + 1
+                concat_part = query[start:end]
+                concat_replacement = concat_part.replace('CONCAT(', '').replace(')', '').replace(', ', ' || ')
+                query = query[:start] + concat_replacement + query[end:]
+
         query = query.replace('%s', '?')
         query = query.replace('CURTIME()', "time('now')")
         query = query.replace('CURRENT_TIMESTAMP', "datetime('now')")
@@ -314,24 +322,37 @@ def get_sites_checked():
 
     return str(checked) if result else None
 
-def get_data(linkurl):
+def split_string(connection, link_id):
+    select_query = "SELECT links FROM sites WHERE ID = ?"
+    cursor = execute_query(connection, select_query, (link_id,))
+    result = fetchone(cursor)
 
-    get_id_query = "SELECT ID FROM sites WHERE URL = %s"
+    if result:
+        links = result[0]
+        link_ids = links.split(',')
+        return [int(link_id) for link_id in link_ids if link_id.isdigit()]
+    return []
+
+def get_data(linkurl):
+    get_id_query = "SELECT ID FROM sites WHERE URL = ?"
     cursor = execute_query(connection, get_id_query, (linkurl,))
     link_id_result = fetchone(cursor)
     if link_id_result:
         link_id = link_id_result[0]
     else:
-        logger.loggingError(f"URL not found in the database.")
-        #print("URL not found in the database.")
+        logger.error(f"URL not found in the database.")
         return None
 
-    execute_query(connection, "DROP TEMPORARY TABLE IF EXISTS temp_links;")
-    execute_query(connection, "CREATE TEMPORARY TABLE temp_links (link_id INT);")
+    execute_query(connection, "DROP TABLE IF EXISTS temp_links;", commit=True)
+    execute_query(connection, "CREATE TABLE temp_links (link_id INTEGER);", commit=True)
 
-    execute_query(connection, f"CALL splitString((SELECT links FROM sites WHERE ID = {link_id}));", multi=True)
+    # Simulate CALL splitString
+    link_ids = split_string(connection, link_id)
+    insert_query = "INSERT INTO temp_links (link_id) VALUES (?);"
+    for lid in link_ids:
+        execute_query(connection, insert_query, (lid,), commit=True)
 
-    execute_query(connection, """
+    result_cursor = execute_query(connection, """
         SELECT URL
         FROM sites
         WHERE ID IN (
@@ -339,12 +360,12 @@ def get_data(linkurl):
             FROM temp_links
         );
     """)
+    result = fetchall(result_cursor)
 
-    result = fetchall(cursor)
-
-    execute_query(connection, "DROP TEMPORARY TABLE IF EXISTS temp_links;")
-
+    execute_query(connection, "DROP TABLE IF EXISTS temp_links;", commit=True)
+    print(result)
     return result
+
 
 # TODO - Add Procedure to script, or add this manually to make this work again
 

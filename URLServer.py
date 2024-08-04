@@ -201,9 +201,9 @@ def update():
     try:    
         output, output2 = DB.insert_into_sites(old_url, url, client_id)
         url_manager.add_entry(output2, client_id)
-
-        return output
-    except:
+        return output.replace("\n", "")
+    except Exception as e:
+        print("returing Nothing:", e)
         return ""
 
 @app.route('/update_checked_urls', methods=['POST'])

@@ -64,7 +64,7 @@ A flask server runs on the server through port 27016 while the client script can
 <img src="Readme_Files/Server-Client.gif" alt="drawing" width="500"/>
 
 
-The urls are stored on a mysql server hosted on the server with the create scripts.
+The urls are stored on a MariaDB server hosted on the server with the create scripts.
 ```
 CREATE TABLE `sites` (
 	`ID` INT(11) NOT NULL AUTO_INCREMENT,
@@ -94,7 +94,9 @@ ENGINE=InnoDB
 
 ```
 
-I have recorded roughly 30,000 websites with this setup and have used only 4 Mib of storage data.
+I have recorded roughly 30,000 websites with this setup and have used only 4 Mib of storage data on my MariaDB server.
+
+Alternatiely, if you don't want to run a seperate MariaDB server, you can run the program without the ``db_config.py`` file and the software will use SQLite to store the infomation.
 
 ### Viewing data
 
@@ -168,13 +170,31 @@ To run the client scripts, the client must have python3 installed on the system 
 
 2. Run the following command ``` git clone https://github.com/AnthonyBebek/WebsiteGrapher```
 
-3. Run the following commands ```python3 -m pip install requests beautifulsoup4 colorama```
+3. Enter the new directory ``cd ./WebsiteGrapher``
 
-4. Change SererIP to point towards your server e.g ```ServerIP = "http://127.0.0.1:27016"```
+4. Run the following commands ```python3 -m pip install -r requirements.txt```
 
-5. Run ```python3 /WebsiteGrapher/RunClient.py```
+5. Change ServerIP to point towards your server e.g ```ServerIP = "http://127.0.0.1:27016"```
 
-#### Server Setup
+6. Run ```python3 /WebsiteGrapher/RunClient.py```
+
+#### Server Setup via docker
+
+Running the server via docker allows you to run the server seperately from your own machine, you still need to open the same ports but adds a layer of security between the software and your machine.
+
+1. Ensure that docker is installed on your machine. This can be found <a href = "https://docs.docker.com/engine/install/">here</a>.
+
+2. Open up a command prompt window or temrinal and navigate to where you want to clone this repo to
+
+3. Run the following command ``` git clone https://github.com/AnthonyBebek/WebsiteGrapher```
+
+4. Enter the new directory ``cd ./WebsiteGrapher``
+
+5. Build the docker image with ``docker build -t websitegrapher . ``
+
+6. Run the new container with the opened ports ``docker run -p 80:80 -p 443:443 -p 27016:27016 --name websitegrapher websitegrapher``
+
+#### Server Setup manually
 
 To run the server scripts, the client must have python3 installed on the system which can be found <a href = "https://www.python.org/downloads/">here</a>
 
@@ -182,11 +202,15 @@ To run the server scripts, the client must have python3 installed on the system 
 
 2. Run the following command ``` git clone https://github.com/AnthonyBebek/WebsiteGrapher```
 
-3. Run the following commands ```python3 -m pip install flask colorama datetime logging```
+3. Enter the new directory ``cd ./WebsiteGrapher``
 
-4. Install mariaDB from <a href = "https://mariadb.org/download/?t=mariadb&p=mariadb&r=11.3.2">here</a>
+4. Run the following commands ```python3 -m pip install -r requirements.txt```
 
-5. Create a new file in the WebsiteGrapher directory called ```db_config.py``` and paste in 
+##### Option 1 - External Database Server
+
+1. Install mariaDB from if you want to run a SQL Server <a href = "https://mariadb.org/download/?t=mariadb&p=mariadb&r=11.3.2">here</a>
+
+2. Create a new file in the WebsiteGrapher directory called ```db_config.py``` and paste in 
 ```
     db_config = {
     'host': '127.0.0.1',
@@ -195,9 +219,15 @@ To run the server scripts, the client must have python3 installed on the system 
     'database': 'websites'
     }
 ``` 
-Make sure to put your replace {MARIADB USERNAME} with your the username you set in the previous step and {MARIADB PASSWORD} with the password
+Make sure to put your replace {MARIADB USERNAME} with your the username you set in the previous step and {MARIADB PASSWORD} with the password. 
 
-6. Run ```python3 /WebsiteGrapher/URLServer.py```
+3. Run ```python3 /WebsiteGrapher/URLServer.py```
+
+##### Option 2 - Internal SQLite Database
+
+1. Run ```python3 /WebsiteGrapher/URLServer.py```
+
+2. If you don't want the warning message run with the tag ``--suppressWarn`` to suppress the SQLite not recommended warnings.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
