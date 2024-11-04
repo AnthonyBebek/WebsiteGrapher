@@ -113,20 +113,6 @@ def update_checked_urls(checked_urls):
     except Exception as e:
         print(f"Error: {e}")
 
-def get_id():
-    server_url = ServerIP + "/newclient"
-    try:
-        response = requests.get(server_url)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get('Client', 'No URL found')
-        else:
-            print(f"Error: {response.status_code} - {response.text}")
-    except ConnectionError:
-        print(f"{errorcode} No conneciton to server{Fore.WHITE} - {Fore.CYAN}{ServerIP}{Fore.WHITE}")
-    except Exception as e:
-        print(f"Error: {e}")
-
 def disconnect(id, url):
     server_url =  ServerIP + "/disconnect"
     payload = {'ID': id, 'URL': url}

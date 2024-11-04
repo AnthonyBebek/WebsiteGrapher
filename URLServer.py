@@ -185,6 +185,7 @@ def query():
 
 @app.route('/update', methods=['POST'])
 def update():
+    start_time = time.perf_counter()
     data = request.get_json()
     url = data.get('url', '')
     old_url = data.get('old_url', '')
@@ -201,6 +202,7 @@ def update():
     try:    
         output, output2 = DB.insert_into_sites(old_url, url, client_id)
         url_manager.add_entry(output2, client_id)
+        print(time.perf_counter() - start_time)
         return output.replace("\n", "")
     except Exception as e:
         print("returing Nothing:", e)
