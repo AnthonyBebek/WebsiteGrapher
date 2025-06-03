@@ -6,6 +6,9 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from colorama import init, Fore, Style
 import time
+import json
+import tldextract
+from urllib.parse import urljoin, urlparse
 init()
 
 id = 0
@@ -14,8 +17,6 @@ addcode = F"{Fore.WHITE}[{Fore.GREEN}+{Fore.WHITE}]"
 errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]{Fore.RED}"
 checkcode = F"{Fore.WHITE}[{Fore.YELLOW}~{Fore.WHITE}]{Fore.YELLOW}"
 newurl = F"{Fore.WHITE}[{Fore.MAGENTA}~{Fore.WHITE}]{Fore.MAGENTA}"
-
-BeginURL = "https://explodingtopics.com/blog/most-visited-websites"
 
 ServerIP = "http://127.0.0.1:27016"
 
@@ -42,7 +43,12 @@ def get_links(url, timeout=5):
         response = requests.get(url, timeout=timeout)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        links = list({urlparse(urljoin(url, a['href'])).scheme + '://' + '.'.join(urlparse(urljoin(url, a['href'])).netloc.split('.')[-2:]) for a in soup.find_all('a', href=True) if url not in urljoin(url, a['href'])})
+        links = list({
+            urlparse(href).scheme + '://' + tldextract.extract(href).top_domain_under_public_suffix
+            for a in soup.find_all('a', href=True)
+            for href in [urljoin(url, a['href'])]
+            if href.startswith(('http://', 'https://')) and url not in href
+        })
         return links
 
     except Timeout as e:
@@ -104,7 +110,11 @@ def update_url(new_url: list, id: int, old_url: str = "") -> None:
     try:
         response = requests.post(server_url, json=payload)
         if response.status_code == 200:
-            print(response.text)
+            #print(response.text)
+            data = json.loads(response.text)
+            for entry in data:
+                line = entry[0].encode().decode('unicode_escape')  # decode escape sequences
+                print(line)
         else:
             print(f"Error: {response.status_code} - {response.text}")
     except ConnectionError:
@@ -162,22 +172,11 @@ def main():
             print(f"{errorcode} Quitting{Fore.WHITE}")
             exit()
         print(f"{addcode} Client Registered! {Fore.YELLOW}Client ID: {Fore.CYAN}", id, f"{Fore.WHITE}")
-        url = BeginURL
-        links = get_links(url)
-        linkPayload = []
-        for i in links:
-            linkPayload.append(i)
-        update_url(linkPayload, id, url)
-        update_checked_urls(url)
-
-        for i in links:
-            update_url(i, id, url)
 
         while True:
             linkPayload = []
             url = get_current_url()
             links = get_links(url)
-            update_url(url, id)
             update_checked_urls(url)
             try:
                 for i in links:
@@ -185,9 +184,8 @@ def main():
             except TypeError:
                 pass
             start_time = time.perf_counter()
-            print("Sending", linkPayload)
             update_url(linkPayload, id, url)
-            print(time.perf_counter() - start_time)
+            #print(time.perf_counter() - start_time)
     except KeyboardInterrupt:
         print(f"{checkcode} Sending disconnect packet")
         disconnect(id, url)

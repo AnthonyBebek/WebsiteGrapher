@@ -72,9 +72,14 @@ def create_tables_if_not_exist(connection):
         Datetime DATETIME DEFAULT NULL
     );
     """
+    insert_first_website = """
+    INSERT INTO sites (URL)
+    VALUES ('https://explodingtopics.com/blog/most-visited-websites');
+    """
     cursor = connection.cursor()
     cursor.execute(create_sites_table)
     cursor.execute(create_stats_table)
+    cursor.execute(insert_first_website)
     connection.commit()
 
 def connect(DBType, DBConfig):
@@ -135,6 +140,8 @@ def start_db():
     global DBConfig
     DBType, DBConfig = connect_to_db()
     connection = connect(DBType, DBConfig)
+
+    return connection
 
 errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]{Fore.RED}"
 addcode = F"{Fore.WHITE}[{Fore.GREEN}+{Fore.WHITE}]{Fore.GREEN}"
@@ -381,7 +388,6 @@ def get_data(linkurl):
     result = fetchall(result_cursor)
 
     execute_query(connection, "DROP TABLE IF EXISTS temp_links;", commit=True)
-    print(result)
     return result
 
 
@@ -416,6 +422,8 @@ DELIMITER ;
 
 def batchUpdateUrl(connection, urls: List[str], link_id: str, clientid: str) -> List[Tuple[str, str]]:
     check_query = "SELECT URL FROM sites WHERE URL IN (%s)" % ','.join(['%s'] * len(urls))
+    urls = list(urls)
+    time.sleep(2)
     cursor = execute_query(connection, check_query, tuple(urls))
     existing_urls = set(row[0] for row in cursor.fetchall())  # URLs that already exist in the DB
 

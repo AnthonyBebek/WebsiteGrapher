@@ -9,7 +9,7 @@ import time
 import json
 import os
 import asyncio
-from API import getAPIConfig, app
+import API
 init()
 
 
@@ -67,12 +67,11 @@ def generateConfig() -> None:
             json.dump(config, jsonfile, indent=4)
     return
 
-def handleAPI() -> None:
+def handleAPI(connection) -> None:
     """
     Handles the API through the Flask framework
     """
-    APIData = getAPIConfig()
-    app.run(host=APIData[0], port=APIData[1]) 
+    API.startAPI(connection)
     return
 
 
@@ -83,11 +82,11 @@ async def main():
 
     # Prepare configurations and database
     generateConfig()
-    DB.start_db()
+    connection = DB.start_db()
     DB.get_server_stats()
 
     # Start API
-    flaskThread = threading.Thread(target=handleAPI, daemon=True)
+    flaskThread = threading.Thread(target=handleAPI, args=[connection], daemon=True)
     flaskThread.start()
     
     

@@ -48,7 +48,6 @@ class APIPages(FlaskView):
         start_time = time.perf_counter()
         data = request.get_json()
         urls = data.get('url', '')
-        print(urls)
         old_url = data.get('old_url', '')
         client_id = data.get('Client', '')
         client = Client.GetClient(str(client_id))
@@ -58,9 +57,9 @@ class APIPages(FlaskView):
         client.UpdateHeartbeat()
 
         try:    
-            output, output2 = DB.batchUpdateUrl(old_url, urls, client_id)
-            print(time.perf_counter() - start_time)
-            return output.replace("\n", "")
+            result = DB.batchUpdateUrl(connection, urls, old_url, client_id)
+            logger.loggingDebug(f"Last update query took - {round(time.perf_counter() - start_time, 2)}s for {len(urls)} url(s)")
+            return result
         except Exception as e:
             print("returing Nothing:", e)
             return ""
@@ -176,7 +175,14 @@ def getAPIConfig() -> dict:
         APIData = configData["API"]
         return APIData[0]["Host"], APIData[0]["Port"]
 
-
+def startAPI(dbconnection) -> None:
+    """
+    Starts the API server, 
+    """
+    global connection
+    connection = dbconnection
+    APIData = getAPIConfig()
+    app.run(host=APIData[0], port=APIData[1]) 
 
 if __name__ == '__main__':
     # Used for testing purposes
