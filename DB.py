@@ -7,36 +7,51 @@ This script stores the URLs in a DB and gets a new link
 import mysql.connector
 import mysql.connector.pooling
 from colorama import init, Fore, Style
+from typing import List, Tuple
 import random
 import sys
 import logger
 import time
 import sqlite3
 import os
+import json
 
 init()
 
 SuppressWarnings = False
 
 
-def connect_to_db():
-    if os.path.exists('./db_config.py'):
-        from db_config import db_config
-        db_type = 'mysql'
-        logger.loggingInfo("Using external MYSQL Server")
+def connect_to_db() -> str:
+    """
+    Establishes connection to database given settings in config.json
+
+    Returns: 
+        Database Type
+        Database Configuration
+    """
+    if not os.path.exists('./config.json'):
+        logger.loggingError("Config file not found!")
+        exit()
     else:
-        db_type = 'sqlite'
-        sqlite_file = "websites.sqlite"
-        logger.loggingInfo("Using SQLite DB")
-        if not os.path.exists(sqlite_file):
-            logger.loggingWarning("SQLite file not found, creating new database")
-            open(sqlite_file, 'w').close()
-        db_config = {'db_file': sqlite_file}
-        if SuppressWarnings == False:
-            logger.loggingWarning('Using SQLite as DB, this is not recommended for servers with more than 10,000 sites')
+        configData = json.load(open("./config.json"))
+        databaseConfig = configData["Database"]
+        DBType = databaseConfig[0]['Type']
+        if DBType == "MySQL":
+            DBType = 'mysql'
+            logger.loggingInfo("Using external MYSQL Server")
         else:
-            print("Ok")
-    return db_type, db_config
+            DBType = 'sqlite'
+            sqlite_file = "websites.sqlite"
+            logger.loggingInfo("Using SQLite DB")
+            if not os.path.exists(sqlite_file):
+                logger.loggingWarning("SQLite file not found, creating new database")
+                open(sqlite_file, 'w').close()
+            DBConfig = {'db_file': sqlite_file}
+            if SuppressWarnings == False:
+                logger.loggingWarning('Using SQLite as DB, this is not recommended for servers with more than 10,000 sites')
+            else:
+                print("Ok")
+        return DBType, DBConfig
 
 def create_tables_if_not_exist(connection):
     create_sites_table = """
@@ -62,25 +77,25 @@ def create_tables_if_not_exist(connection):
     cursor.execute(create_stats_table)
     connection.commit()
 
-def connect(db_type, db_config):
-    if db_type == 'mysql':
+def connect(DBType, DBConfig):
+    if DBType == 'mysql':
         connection = mysql.connector.connect(
-        host=db_config['host'],
-        user=db_config['user'],
-        password=db_config['password'],
-        database=db_config['websites']
+        host=DBConfig['host'],
+        user=DBConfig['user'],
+        password=DBConfig['password'],
+        database=DBConfig['websites']
     )  
-    elif db_type == "sqlite":
-        connection = sqlite3.connect(db_config['db_file'], check_same_thread=False)
+    elif DBType == "sqlite":
+        connection = sqlite3.connect(DBConfig['db_file'], check_same_thread=False)
         create_tables_if_not_exist(connection)
     else:
         logger.loggingError("Unsupported database type!")
         quit()
     return connection
 
-def execute_query(connection, query, params=None, commit=False):
+def execute_query(connection, query: str, params: str = None, commit: bool = False, many: bool = False):
 
-    if db_type == 'sqlite':
+    if DBType == 'sqlite':
         if 'CONCAT' in query:
             while 'CONCAT' in query:
                 start = query.index('CONCAT')
@@ -95,7 +110,10 @@ def execute_query(connection, query, params=None, commit=False):
         query = query.replace('RAND()', "RANDOM()")
 
     cursor = connection.cursor()
-    cursor.execute(query, params or ())
+    if many:
+        cursor.executemany(query, params or ())
+    else:
+        cursor.execute(query, params or ())
     if commit:
         connection.commit()
     return cursor
@@ -109,14 +127,14 @@ def fetchone(cursor):
 def close_connection(connection):
     connection.close()
 
-db_type, db_config, connection = None, None, None
+DBType, DBConfig, connection = None, None, None
 
 def start_db():
     global connection
-    global db_type
-    global db_config
-    db_type, db_config = connect_to_db()
-    connection = connect(db_type, db_config)
+    global DBType
+    global DBConfig
+    DBType, DBConfig = connect_to_db()
+    connection = connect(DBType, DBConfig)
 
 errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]{Fore.RED}"
 addcode = F"{Fore.WHITE}[{Fore.GREEN}+{Fore.WHITE}]{Fore.GREEN}"
@@ -219,7 +237,7 @@ def get_server_stats():
     return Web_Logged_Count, Web_Searched_Count, Connected_Clients, Fixed_Timestamps 
     
 
-def insert_into_sites(linkurl, url, clientid):
+def insert_into_sites(linkurl: str, urls: list, clientid: str) -> None:
 
     try:
         get_id_query = "SELECT ID FROM sites WHERE URL = %s"
@@ -395,6 +413,42 @@ END$$
 DELIMITER ;
 '''
 
+
+def batchUpdateUrl(connection, urls: List[str], link_id: str, clientid: str) -> List[Tuple[str, str]]:
+    check_query = "SELECT URL FROM sites WHERE URL IN (%s)" % ','.join(['%s'] * len(urls))
+    cursor = execute_query(connection, check_query, tuple(urls))
+    existing_urls = set(row[0] for row in cursor.fetchall())  # URLs that already exist in the DB
+
+    # Prepare data for batch processing
+    update_data = []
+    insert_data = []
+    results = []
+
+    for url in urls:
+        if url in existing_urls:
+            # Prepare data for updating
+            update_data.append((f',{link_id}' if link_id else '', url))
+            results.append((f"{checkcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.YELLOW} URL Found: {url}", "0-" + url))
+        else:
+            # Prepare data for inserting
+            insert_data.append((url, str(link_id) if link_id else None))
+            results.append((f"{addcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.GREEN} Added: {url}", "1-" + url))
+
+    # Execute batch updates
+    if update_data:
+        update_query = """
+            UPDATE sites
+            SET Ref = Ref + 1, links = CONCAT(COALESCE(links, ''), %s)
+            WHERE URL = %s
+        """
+        execute_query(connection, update_query, update_data, commit=True, many=True)
+
+    # Execute batch inserts
+    if insert_data:
+        insert_query = "INSERT INTO sites (URL, links) VALUES (%s, %s)"
+        execute_query(connection, insert_query, insert_data, commit=True, many=True)
+
+    return results
 
 
 

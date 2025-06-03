@@ -1,0 +1,22 @@
+{
+    "Database": [
+        {
+            "Type": "SQLite",
+            "Host": "127.0.0.1",
+            "Username": "user",
+            "Password": "pass",
+            "Database": "websites"
+        }
+    ],
+    "Website": [
+        {
+            "Port": 8080
+        }
+    ],
+    "API": [
+        {
+            "Host": "0.0.0.0",
+            "Port": 27016
+        }
+    ]
+}

@@ -5,6 +5,7 @@ from requests.exceptions import Timeout, ConnectionError, RequestException
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from colorama import init, Fore, Style
+import time
 init()
 
 id = 0
@@ -86,7 +87,18 @@ def get_current_url():
         global id
         id = get_id()
 
-def update_url(new_url, id, old_url = ""):
+def update_url(new_url: list, id: int, old_url: str = "") -> None:
+    """
+    Push found URL to given API through '/update'
+
+    Parameters:
+        - new_url (list): A list of the URLS to push to the API
+        - id (int): A interger that repesents the ID of the client
+        - old_url (str): The origional URL that links to the new URLs
+
+    Returns:
+        - None
+    """
     server_url =  ServerIP + "/update"
     payload = {'url': new_url, 'old_url': old_url, 'Client': id}
     try:
@@ -100,6 +112,7 @@ def update_url(new_url, id, old_url = ""):
     except Exception as e:
         print(f"Error: {e}")
         id = get_id()
+    return None
 
 def update_checked_urls(checked_urls):
     server_url =  ServerIP + "/update_checked_urls"
@@ -151,22 +164,30 @@ def main():
         print(f"{addcode} Client Registered! {Fore.YELLOW}Client ID: {Fore.CYAN}", id, f"{Fore.WHITE}")
         url = BeginURL
         links = get_links(url)
-        update_url(url, id)
+        linkPayload = []
+        for i in links:
+            linkPayload.append(i)
+        update_url(linkPayload, id, url)
         update_checked_urls(url)
 
         for i in links:
             update_url(i, id, url)
 
         while True:
+            linkPayload = []
             url = get_current_url()
             links = get_links(url)
             update_url(url, id)
             update_checked_urls(url)
             try:
                 for i in links:
-                    update_url(i, id, url)
+                    linkPayload.append(i)
             except TypeError:
                 pass
+            start_time = time.perf_counter()
+            print("Sending", linkPayload)
+            update_url(linkPayload, id, url)
+            print(time.perf_counter() - start_time)
     except KeyboardInterrupt:
         print(f"{checkcode} Sending disconnect packet")
         disconnect(id, url)
