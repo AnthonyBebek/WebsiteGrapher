@@ -1,0 +1,48 @@
+name: WebsiteGrapher CI
+
+on: [push, pull_request]
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install Python dependencies
+      run: python3 -m pip install -r requirements.txt
+
+    - name: Create dummy SQLite db_config.py
+      run: |
+        echo "db_config = {}" > db_config.py
+
+    - name: Start server and client
+      run: |
+        # Start the server
+        python3 WebsiteGrapher/URLServer.py --suppressWarn > server.log 2>&1 &
+        SERVER_PID=$!
+
+        # Allow server to spin up
+        sleep 3
+
+        # Start the client
+        python3 WebsiteGrapher/RunClient.py > client.log 2>&1 &
+        CLIENT_PID=$!
+
+        # Let them run for a while and "talk"
+        sleep 10
+
+        # Print logs for debugging
+        echo "=== SERVER LOG ==="
+        cat server.log
+        echo "=== CLIENT LOG ==="
+        cat client.log
+
+        # Kill both processes (cleanup)
+        kill $SERVER_PID $CLIENT_PID || true
