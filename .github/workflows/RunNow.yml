@@ -1,0 +1,37 @@
+name: Run WebsiteGrapher locally
+
+on:
+  workflow_dispatch:  # lets you run manually from GitHub web UI
+
+jobs:
+  run-on-my-server:
+    runs-on: [self-hosted, linux]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: python3 -m pip install -r requirements.txt
+
+    - name: Create dummy db_config for SQLite
+      run: echo "db_config = {}" > db_config.py
+
+    - name: Start server and client
+      run: |
+        python3 WebsiteGrapher/URLServer.py --suppressWarn > server.log 2>&1 &
+        SERVER_PID=$!
+        sleep 3
+        python3 WebsiteGrapher/RunClient.py > client.log 2>&1 &
+        CLIENT_PID=$!
+        sleep 10
+        echo "=== SERVER LOG ==="
+        cat server.log
+        echo "=== CLIENT LOG ==="
+        cat client.log
+        kill $SERVER_PID $CLIENT_PID || true
