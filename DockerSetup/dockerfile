@@ -1,0 +1,27 @@
+FROM ubuntu:latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies
+RUN apt-get update && \
+    apt-get install -y \
+        python3 \
+        python3-pip \
+        tor \
+        curl \
+        tzdata \
+        supervisor && \
+    apt-get clean
+
+# Copy app files
+COPY .. /app
+WORKDIR /app
+
+# Install Python requirements
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
+
+# Copy supervisor config file
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Start both tor and the client using supervisord
+CMD ["supervisord", "-n"]

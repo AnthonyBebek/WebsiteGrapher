@@ -13,7 +13,7 @@ import logger
 import logging
 import time
 import os
-
+import base64
 
 app = Flask(__name__)
 
@@ -48,6 +48,8 @@ class APIPages(FlaskView):
         start_time = time.perf_counter()
         data = request.get_json()
         urls = data.get('url', '')
+        # page data is encoded base64 so there's no issue with HTML escape characters
+        pages = base64.b64decode(str(data.get('page', ''))).decode('utf-8')
         old_url = data.get('old_url', '')
         client_id = data.get('Client', '')
         client = Client.GetClient(str(client_id))
@@ -57,7 +59,7 @@ class APIPages(FlaskView):
         client.UpdateHeartbeat()
 
         try:    
-            result = DB.batchUpdateUrl(connection, urls, old_url, client_id)
+            result = DB.batchUpdateUrl(connection, urls, pages, old_url, client_id)
             logger.loggingDebug(f"Last update query took - {round(time.perf_counter() - start_time, 2)}s for {len(urls)} url(s)")
             return result
         except Exception as e:

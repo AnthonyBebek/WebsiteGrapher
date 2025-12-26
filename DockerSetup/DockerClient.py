@@ -10,6 +10,14 @@ import json
 import tldextract
 from urllib.parse import urljoin, urlparse
 import base64
+import socks
+import socket
+socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 9050)
+
+proxies = {
+    'http': 'socks5h://127.0.0.1:9050',
+    'https': 'socks5h://127.0.0.1:9050'
+}
 
 init()
 
@@ -20,7 +28,7 @@ errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]{Fore.RED}"
 checkcode = F"{Fore.WHITE}[{Fore.YELLOW}~{Fore.WHITE}]{Fore.YELLOW}"
 newurl = F"{Fore.WHITE}[{Fore.MAGENTA}~{Fore.WHITE}]{Fore.MAGENTA}"
 
-ServerIP = "http://127.0.0.1:27016"
+ServerIP = "http://websitegrapher-grapherserver-1:27016"
 
 # The server has rebooted, so reautorize yourself with your old ID
 def Reconnect(id):
@@ -42,7 +50,7 @@ def Reconnect(id):
 def get_links(url, timeout=5):
 
     try:
-        response = requests.get(url, timeout=timeout)
+        response = requests.get(url, proxies=proxies, timeout=timeout)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         links = list({

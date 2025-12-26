@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  grapherclient:
+    build: .
+    restart: unless-stopped
+    tty: true
+    networks:
+      - webgraph
+
+  grapherserver:
+    build: .
+    restart: unless-stopped
+    tty: true
+    networks:
+      - webgraph
+    command: python3 Server.py
+
+networks:
+  webgraph:
+    driver: bridge

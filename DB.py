@@ -15,6 +15,11 @@ import time
 import sqlite3
 import os
 import json
+import re
+import threading
+
+_sqlite_lock = threading.Lock()
+
 
 init()
 
@@ -60,7 +65,7 @@ def create_tables_if_not_exist(connection):
         Ref INTEGER DEFAULT 1,
         Links TEXT DEFAULT '0',
         Checked INTEGER DEFAULT 0,
-        URL TEXT NOT NULL
+        URL TEXT NOT NULL UNIQUE
     );
     """
     create_stats_table = """
@@ -72,13 +77,24 @@ def create_tables_if_not_exist(connection):
         Datetime DATETIME DEFAULT NULL
     );
     """
+    create_pages_table = """
+    CREATE TABLE IF NOT EXISTS pages (
+        ID INTEGER PRIMARY KEY AUTOINCREMENT,
+        SiteID INTEGER NOT NULL,
+        Page TEXT DEFAULT NULL,
+        Category TEXT DEFAULT NULL,
+        FOREIGN KEY (SiteID) REFERENCES sites(ID) 
+        );
+    """
+
     insert_first_website = """
-    INSERT INTO sites (URL)
+    INSERT OR IGNORE INTO sites (URL)
     VALUES ('https://explodingtopics.com/blog/most-visited-websites');
     """
     cursor = connection.cursor()
     cursor.execute(create_sites_table)
     cursor.execute(create_stats_table)
+    cursor.execute(create_pages_table)
     cursor.execute(insert_first_website)
     connection.commit()
 
@@ -99,29 +115,32 @@ def connect(DBType, DBConfig):
     return connection
 
 def execute_query(connection, query: str, params: str = None, commit: bool = False, many: bool = False):
-
     if DBType == 'sqlite':
-        if 'CONCAT' in query:
-            while 'CONCAT' in query:
-                start = query.index('CONCAT')
-                end = query.index(')', start) + 1
-                concat_part = query[start:end]
-                concat_replacement = concat_part.replace('CONCAT(', '').replace(')', '').replace(', ', ' || ')
-                query = query[:start] + concat_replacement + query[end:]
-
         query = query.replace('%s', '?')
         query = query.replace('CURTIME()', "time('now')")
         query = query.replace('CURRENT_TIMESTAMP', "datetime('now')")
         query = query.replace('RAND()', "RANDOM()")
 
-    cursor = connection.cursor()
-    if many:
-        cursor.executemany(query, params or ())
+    if DBType == 'sqlite':
+        with _sqlite_lock:
+            cursor = connection.cursor()
+            if many:
+                cursor.executemany(query, params or ())
+            else:
+                cursor.execute(query, params or ())
+            if commit:
+                connection.commit()
+            return cursor
     else:
-        cursor.execute(query, params or ())
-    if commit:
-        connection.commit()
-    return cursor
+        # For other DBs, assume threadsafe or pooled
+        cursor = connection.cursor()
+        if many:
+            cursor.executemany(query, params or ())
+        else:
+            cursor.execute(query, params or ())
+        if commit:
+            connection.commit()
+        return cursor
 
 def fetchall(cursor):
     return cursor.fetchall()
@@ -420,18 +439,26 @@ DELIMITER ;
 '''
 
 
-def batchUpdateUrl(connection, urls: List[str], link_id: str, clientid: str) -> List[Tuple[str, str]]:
+def batchUpdateUrl(connection, urls: List[str], page: str, link_url: str, clientid: str) -> List[Tuple[str, str]]:
+    # Get a list of the urls that's currently in the DB
     check_query = "SELECT URL FROM sites WHERE URL IN (%s)" % ','.join(['%s'] * len(urls))
     urls = list(urls)
-    time.sleep(2)
     cursor = execute_query(connection, check_query, tuple(urls))
     existing_urls = set(row[0] for row in cursor.fetchall())  # URLs that already exist in the DB
 
-    # Prepare data for batch processing
+    # Get ID of linking URL
+    check_query = "SELECT ID FROM sites WHERE URL = %s"
+    cursor = execute_query(connection, check_query, (link_url,))
+    link_id = cursor.fetchone()
+
+    link_id = str(re.sub("[(]", "", re.sub("[)]", "", re.sub("[,]", "", str(link_id)))))
+
+    # Prepare urls for batch processing
     update_data = []
     insert_data = []
     results = []
 
+    # Handle the urls
     for url in urls:
         if url in existing_urls:
             # Prepare data for updating
@@ -439,16 +466,29 @@ def batchUpdateUrl(connection, urls: List[str], link_id: str, clientid: str) -> 
             results.append((f"{checkcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.YELLOW} URL Found: {url}", "0-" + url))
         else:
             # Prepare data for inserting
-            insert_data.append((url, str(link_id) if link_id else None))
+            insert_data.append((url, str(link_id) if link_id else ''))
             results.append((f"{addcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.GREEN} Added: {url}", "1-" + url))
+
+    # Handle the page data
+    if link_id:
+        insert_query = "INSERT INTO pages (SiteID, Page) VALUES (%s, %s)"
+        execute_query(connection, insert_query, (link_id, page), commit=True)
 
     # Execute batch updates
     if update_data:
-        update_query = """
-            UPDATE sites
-            SET Ref = Ref + 1, links = CONCAT(COALESCE(links, ''), %s)
-            WHERE URL = %s
-        """
+        if DBType == 'sqlite':
+            update_query = """
+                UPDATE sites
+                SET Ref = Ref + 1, links = COALESCE(links, '') || ?
+                WHERE URL = ?
+            """
+        else:
+            update_query = """
+                UPDATE sites
+                SET Ref = Ref + 1, links = CONCAT(COALESCE(links, ''), %s)
+                WHERE URL = %s
+            """
+
         execute_query(connection, update_query, update_data, commit=True, many=True)
 
     # Execute batch inserts
@@ -457,6 +497,30 @@ def batchUpdateUrl(connection, urls: List[str], link_id: str, clientid: str) -> 
         execute_query(connection, insert_query, insert_data, commit=True, many=True)
 
     return results
+
+
+# Fetch the data that is already categorized
+def fetchTrainData(connection):
+    fetchQuery = "SELECT Page, Category FROM pages WHERE Page IS NOT NULL AND Category IS NOT NULL"
+    cursor = execute_query(connection, fetchQuery)
+    data = cursor.fetchall()
+    page, category = zip(*data) if data else ([], [])
+    print("Training Data Collected")
+    return list(page), list(category)
+
+def fetchUnlabeledData(connection, limit=50):
+    fetchQuery = "SELECT ID, Page FROM pages WHERE Page IS NOT NULL AND Category IS NULL LIMIT ?"
+    cursor = execute_query(connection, fetchQuery, (limit,))
+    data = cursor.fetchall()
+    print(f"{limit} rows of unlabeled data collected")
+    return data
+
+def updateCategoryData(connection, pageID, category):
+    updateQuery = "UPDATE pages SET Category = ? WHERE ID = ?"
+    execute_query(connection, updateQuery, (category, pageID), commit=True)
+    return
+
+
 
 
 
