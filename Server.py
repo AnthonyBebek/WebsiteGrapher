@@ -1,105 +1,130 @@
-import logger
-import DB
-import argparse
-from ClientHandling import *
-from colorama import init
-import datetime
-import threading
-import time
-import json
-import os
-import asyncio
-import API
-init()
+from typing import Union
+from fastapi import FastAPI, Request
+import DB as DB
+from ClientHandling import Client
+from datetime import datetime, timedelta
+import Logger as logger
 
+ClientCount = 0
+ClientList = []
 
-parser = argparse.ArgumentParser(description="Options:")
+app = FastAPI()
 
-parser.add_argument('--suppressWarn', action='store_true', help='Suppress warning messages (Only use this if you really know what you are doing!)')
-args = parser.parse_args()
+# Deifne root path
+@app.get("/")
+def read_root():
+    """
+    Handles GET requests to the root URL.
+    """
+    return {"ClientCount": Client.GetClientCount()}
 
-DB.SuppressWarnings = args.suppressWarn
+# Define path for getting new links
+@app.get("/new_link")
+def readItem():
+    """
+    Handles GET requests to retrieve a new link.
+    return str: link
+    """
+    url = DB.getUncheckedURL()
+    if url != None:
+        response = {'url': url}
+        return response
+    return
 
-stop_event = threading.Event()
-
-
-def ClientCleaner() -> None:
+@app.post("/update")
+def updateLinks(payload: dict):
+    """
+    Handles POST requests to update links.
+    payload: dict containing 'url', 'page', 'old_url', and 'Client'
+    return list: updated links
+    """
     try:
-        while not stop_event.is_set():
-            clients = Client.GetClients()
-            now = datetime.datetime.now()
-            
-            for client in clients:
-                if (now - client.LastHeartbeat).total_seconds() >= 60:
-                    logger.loggingInfo(f"Killed client: {client.ClientNumber} Last heartbeat was: {(now - client.LastHeartbeat).total_seconds()} ago")
-                    client.ReleaseClientNumber()
-            time.sleep(1)
+        # Unpack payload
+        new_url = payload.get('url')
+        new_page = payload.get('page')
+        old_url = payload.get('old_url')
+        client_id = payload.get('Client')
+
+        # Handle client heartbeat
+        client = Client.GetClient(client_id)
+        if client_id is None:
+            logger.loggingWarning(f"Client {client_id} doesn't exsist!")
+            return {"error": "Client ID is missing"}
+        else:
+            client.UpdateHeartbeat()
+
+        # Update links in the database
+        updated_links = DB.batchAddWebsites(new_url, new_page, old_url, client_id)
+        return updated_links
     except Exception as e:
-        logger.loggingError(f"Exception in ClientCleaner: {e}")
-    return
-
-def generateConfig() -> None:
-    if os.path.exists('./config.json'):
-        configData = json.load(open("./config.json"))
-        logger.loggingInfo("Reading configurations")
-    else:
-        logger.loggingWarning("No config file found!")
-        logger.loggingInfo("Creating new config file")
-
-        config = {
-            "Database": [
-                    {
-                    "Type": "SQLite",
-                    "Host": "127.0.0.1",
-                    "Username": "user",
-                    "Password": "pass",
-                    "Database": "websites"
-                    }
-                ],
-                "API": [
-                    {
-                        "Host": "0.0.0.0",
-                        "Port": 27016
-                    }
-                ]
-            }
-        with open('./config.json', 'w') as jsonfile:
-            json.dump(config, jsonfile, indent=4)
-    return
-
-def handleAPI(connection) -> None:
-    """
-    Handles the API through the Flask framework
-    """
-    API.startAPI(connection)
-    return
-
-
-async def main():
-    # Start the client cleaner to manage heartbeats
-    cleanerThread = threading.Thread(target=ClientCleaner, daemon=True)
-    cleanerThread.start()
-
-    # Prepare configurations and database
-    generateConfig()
-    connection = DB.start_db()
-    DB.get_server_stats()
-
-    # Start API
-    flaskThread = threading.Thread(target=handleAPI, args=[connection], daemon=True)
-    flaskThread.start()
+        return {"error": str(e)}
     
-    
+@app.post("/update_checked_urls")
+def updateCheckedUrls(payload: dict):
+    """
+    Handles POST requests to update checked URLs.
+    payload: dict containing 'checked_urls'
+    """
     try:
-        while True:
-            time.sleep(0.01)
-    except KeyboardInterrupt:
-        print("Closing Server")
-        stop_event.set()
-        cleanerThread.join()
-        import os
-        os._exit(0)
+        checked_urls = payload.get('checked_urls')
+        StatusCode = payload.get('StatusCode')
+        DB.updateCheckedStatus(checked_urls, StatusCode)
+        if StatusCode == 429:
+            logger.loggingWarning(f"Received 429 Too Many Requests for URLs: {checked_urls}")
+        return {"status": "success"}
+    except Exception as e:
+        return {"error": str(e)}
 
+@app.get('/new_client')
+def newClient(request: Request):
+    """
+    Handles GET requests to register a new client.
+    return int: client ID
+    """
+    # Register new client
+    client_ip = request.client.host
+    new_client = Client(datetime.now(), client_ip)
+    ClientList.append(new_client)
+    client_id = new_client.ClientNumber
+    logger.loggingInfo(f"New client connected: {client_id} from IP: {client_ip}")
+    return {"ClientID": client_id}
 
-if __name__ == "__main__":
-    asyncio.run(main())
+@app.get("/robots_txt/{site_id}")
+def getRobotsTxt(site_id: int):
+    '''
+    % Retrieves the robots.txt rules for a given site.
+    %
+    Params:
+        site_id: int - The ID of the site.
+    Returns:
+        dict: The robots.txt rules or an error message.
+    '''
+    try:
+        robots_txt = DB.getRobotsTxt(site_id)
+        if robots_txt:
+            return robots_txt
+        else:
+            return {"error": "No robots.txt found for site."}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/robots_txt")
+def AddRobotsTxt(payload: dict):
+    '''
+    % Creates or updates the robots.txt rules for a site.
+    %
+    Params:
+        payload: dict - Contains 'site_url', 'allowed', 'disallowed', and 'user_agent'.
+    Returns:
+        dict: Success or error message.
+    '''
+    try:
+        site_url = payload.get('site_url')
+        allowed = payload.get('allowed')
+        disallowed = payload.get('disallowed')
+        user_agent = payload.get('user_agent')
+        
+        DB.createRobotsTxt(site_url, allowed, disallowed, user_agent)
+        return {"status": "created"}
+    except Exception as e:
+        return {"error": str(e)}

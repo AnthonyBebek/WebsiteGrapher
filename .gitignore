@@ -11,3 +11,4 @@ venv
 env/
 *.ps1
 *.db
+temp.sh

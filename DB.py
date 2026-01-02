@@ -1,166 +1,10 @@
-'''
-This script is used as a dependancy for the URLServer.py file, if you are running this program as a client only, then it's safe to delete it
-
-This script stores the URLs in a DB and gets a new link
-'''
-
-import mysql.connector
-import mysql.connector.pooling
-from colorama import init, Fore, Style
+from sqlmodel import Field, Session, SQLModel, create_engine, select
+from sqlalchemy import func
 from typing import List, Tuple
-import random
-import sys
-import logger
-import time
-import sqlite3
-import os
-import json
-import re
-import threading
-
-_sqlite_lock = threading.Lock()
-
-
-init()
-
-SuppressWarnings = False
-
-
-def connect_to_db() -> str:
-    """
-    Establishes connection to database given settings in config.json
-
-    Returns: 
-        Database Type
-        Database Configuration
-    """
-    if not os.path.exists('./config.json'):
-        logger.loggingError("Config file not found!")
-        exit()
-    else:
-        configData = json.load(open("./config.json"))
-        databaseConfig = configData["Database"]
-        DBType = databaseConfig[0]['Type']
-        if DBType == "MySQL":
-            DBType = 'mysql'
-            logger.loggingInfo("Using external MYSQL Server")
-        else:
-            DBType = 'sqlite'
-            sqlite_file = "websites.sqlite"
-            logger.loggingInfo("Using SQLite DB")
-            if not os.path.exists(sqlite_file):
-                logger.loggingWarning("SQLite file not found, creating new database")
-                open(sqlite_file, 'w').close()
-            DBConfig = {'db_file': sqlite_file}
-            if SuppressWarnings == False:
-                logger.loggingWarning('Using SQLite as DB, this is not recommended for servers with more than 10,000 sites')
-            else:
-                print("Ok")
-        return DBType, DBConfig
-
-def create_tables_if_not_exist(connection):
-    create_sites_table = """
-    CREATE TABLE IF NOT EXISTS sites (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        Ref INTEGER DEFAULT 1,
-        Links TEXT DEFAULT '0',
-        Checked INTEGER DEFAULT 0,
-        URL TEXT NOT NULL UNIQUE
-    );
-    """
-    create_stats_table = """
-    CREATE TABLE IF NOT EXISTS stats (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        WebLogged INTEGER DEFAULT 0,
-        WebSearch INTEGER DEFAULT 0,
-        Clients INTEGER DEFAULT 0,
-        Datetime DATETIME DEFAULT NULL
-    );
-    """
-    create_pages_table = """
-    CREATE TABLE IF NOT EXISTS pages (
-        ID INTEGER PRIMARY KEY AUTOINCREMENT,
-        SiteID INTEGER NOT NULL,
-        Page TEXT DEFAULT NULL,
-        Category TEXT DEFAULT NULL,
-        FOREIGN KEY (SiteID) REFERENCES sites(ID) 
-        );
-    """
-
-    insert_first_website = """
-    INSERT OR IGNORE INTO sites (URL)
-    VALUES ('https://explodingtopics.com/blog/most-visited-websites');
-    """
-    cursor = connection.cursor()
-    cursor.execute(create_sites_table)
-    cursor.execute(create_stats_table)
-    cursor.execute(create_pages_table)
-    cursor.execute(insert_first_website)
-    connection.commit()
-
-def connect(DBType, DBConfig):
-    if DBType == 'mysql':
-        connection = mysql.connector.connect(
-        host=DBConfig['host'],
-        user=DBConfig['user'],
-        password=DBConfig['password'],
-        database=DBConfig['websites']
-    )  
-    elif DBType == "sqlite":
-        connection = sqlite3.connect(DBConfig['db_file'], check_same_thread=False)
-        create_tables_if_not_exist(connection)
-    else:
-        logger.loggingError("Unsupported database type!")
-        quit()
-    return connection
-
-def execute_query(connection, query: str, params: str = None, commit: bool = False, many: bool = False):
-    if DBType == 'sqlite':
-        query = query.replace('%s', '?')
-        query = query.replace('CURTIME()', "time('now')")
-        query = query.replace('CURRENT_TIMESTAMP', "datetime('now')")
-        query = query.replace('RAND()', "RANDOM()")
-
-    if DBType == 'sqlite':
-        with _sqlite_lock:
-            cursor = connection.cursor()
-            if many:
-                cursor.executemany(query, params or ())
-            else:
-                cursor.execute(query, params or ())
-            if commit:
-                connection.commit()
-            return cursor
-    else:
-        # For other DBs, assume threadsafe or pooled
-        cursor = connection.cursor()
-        if many:
-            cursor.executemany(query, params or ())
-        else:
-            cursor.execute(query, params or ())
-        if commit:
-            connection.commit()
-        return cursor
-
-def fetchall(cursor):
-    return cursor.fetchall()
-
-def fetchone(cursor):
-    return cursor.fetchone()
-
-def close_connection(connection):
-    connection.close()
-
-DBType, DBConfig, connection = None, None, None
-
-def start_db():
-    global connection
-    global DBType
-    global DBConfig
-    DBType, DBConfig = connect_to_db()
-    connection = connect(DBType, DBConfig)
-
-    return connection
+import Logger as logger
+from colorama import init, Fore
+import json  # Added for handling JSON strings
+from datetime import datetime
 
 errorcode = F"{Fore.WHITE}[{Fore.RED}!{Fore.WHITE}]{Fore.RED}"
 addcode = F"{Fore.WHITE}[{Fore.GREEN}+{Fore.WHITE}]{Fore.GREEN}"
@@ -169,371 +13,278 @@ foundcheck = F"{Fore.WHITE}[{Fore.MAGENTA}Server Info{Fore.WHITE}]{Fore.MAGENTA}
 IDCodeOpen = F"{Fore.WHITE}[{Fore.CYAN}Client: "
 IDCodeClose = F"{Fore.WHITE}]"
 
-def update_server_stats(Clients):
+class Websites(SQLModel, table=True):
+    ID: int = Field(default=None, primary_key=True)
+    Ref: str = Field(default="[]")
+    LinksTo: str = Field(default=0)
+    Checked: bool = Field(default=False)
+    URL: str = Field(nullable=False, unique=True)
+    StatusCode: int = Field(default=0)
+    RobotsTxt: bool = Field(default=False)
+    Country: str = Field(default="Unknown")
+    LastChecked: datetime = Field(default=datetime.min)
+
+class Pages(SQLModel, table=True):
+    ID: int = Field(default=None, primary_key=True)
+    SiteID: int = Field(nullable=False, foreign_key="websites.ID")
+    Page: str = Field(default=None)
+    Language: str = Field(default=None)
+    category: str = Field(default=None)
+
+class RobotsTxt(SQLModel, table=True):
+    ID: int = Field(default=None, primary_key=True)
+    SiteID: int = Field(nullable=False, foreign_key="websites.ID")
+    Allowed: str = Field(default="[]")
+    Disallowed: str = Field(default="[]")
+    UserAgent: str = Field(default="*")
+    LastFetched: datetime = Field(default=datetime.min)
+
+engine = create_engine("sqlite:///database.db")
+
+SQLModel.metadata.create_all(engine)
+
+with Session(engine) as session:
+    exists = session.exec(
+        select(Websites).where(Websites.URL == "https://www.similarweb.com/top-websites/")
+    ).first()
+
+    if not exists:
+        session.add(Websites(URL="https://www.similarweb.com/top-websites/"))
+        session.add(Websites(URL="https://www.semrush.com/website/top/"))
+        session.add(Websites(URL="https://www.imdb.com"))
+        session.add(Websites(URL="https://www.wikipedia.org"))
+        session.add(Websites(URL="https://www.dailymotion.com"))
+        session.add(Websites(URL="https://www.gravatar.com"))
+        session.add(Websites(URL="https://www.bbc.com"))
+        session.add(Websites(URL="https://www.cnn.com"))
+        session.add(Websites(URL="https://www.nytimes.com"))
+        session.add(Websites(URL="https://www.theguardian.com/international"))
 
 
+        session.commit()
+
+def getUncheckedURL() -> str:
     '''
-    Adds a new entry to the stats table.
-
-    Inserts;
-
-    - Websites Logged Count
-    - Websites Searched Count
-    - Currently Connected Clients
-    - Current Time
-    
-    '''
-
-    # Get the current Websites Logged Count
-
-
-    try:
-        get_curreny_websites_query = "SELECT COUNT(*) FROM sites UNION SELECT COUNT(*) FROM sites WHERE checked = 1;"
-        cursor = execute_query(connection, get_curreny_websites_query)
-        count_result = fetchall(cursor)
-        if count_result:
-            Web_Logged_Count = count_result[0][0]
-            Web_Searched_Count = count_result[1][0]
-        else:
-            Web_Logged_Count = None
-            Web_Searched_Count = None
-
-    except mysql.connector.Error as err:
-        print(f"Error: {err}")
-
-    try:
-        update_stats_query = f"INSERT INTO stats (WebLogged, WebSearch, Clients, DATETIME) VALUES ({Web_Logged_Count}, {Web_Searched_Count}, {Clients}, CURTIME())"
-        cursor = execute_query(connection, update_stats_query, commit = True)
-
-    except mysql.connector.Error as err:
-        print(f"Error: {err}")
-
-def get_server_stats():
-    '''
-    Returns;
-
-    - Websites Logged Count
-    - Websites Searched Count
-    - Currently Connected Clients
-    - Current Time
-
-    from the stats table in the database
-
+    Retrieves an unchecked URL from the database.
+    Returns:
+        str: An unchecked URL or None if none are available.
     '''
 
     try:
-        get_server_stats_query = "SELECT WebLogged, WebSearch, Clients, DATETIME FROM stats ORDER BY ID DESC LIMIT 12;"
-        cursor = execute_query(connection, get_server_stats_query)
-        stats_result = fetchall(cursor)
-        #print(stats_result)
-        Web_Logged_Count = []
-        Web_Searched_Count = []
-        Connected_Clients = []
-        timestamp = []
-        if not stats_result == None:
-            for entry in stats_result:
-                Web_Logged_Count.append(entry[0])
-                Web_Searched_Count.append(entry[1])
-                Connected_Clients.append(entry[2])
-                timestamp.append(entry[3])
-        else:
-            Web_Logged_Count = None
-            Web_Searched_Count = None
-            Connected_Clients = None
-            timestamp = None
-
-        Web_Logged_Count.reverse()
-        Web_Searched_Count.reverse()
-        Connected_Clients.reverse()
-        timestamp.reverse()
-
-        Fixed_Timestamps = []
-
-        for time in timestamp:
-            time = str(time)
-            time.replace("datetime.datetime", "")
-            time = time[11:]
-            time = time[:-3]
-            Fixed_Timestamps.append(time)
-        Fixed_Timestamps = list(Fixed_Timestamps)
-
-    except mysql.connector.Error as err:
-        print(f"Error: {err}")
-
-    return Web_Logged_Count, Web_Searched_Count, Connected_Clients, Fixed_Timestamps 
-    
-
-def insert_into_sites(linkurl: str, urls: list, clientid: str) -> None:
-
-    try:
-        get_id_query = "SELECT ID FROM sites WHERE URL = %s"
-        cursor = execute_query(connection, get_id_query, (linkurl,))
-        link_id_result = fetchall(cursor)
-        if link_id_result:
-            link_id = link_id_result[0]
-        else:
-            link_id = None
-
-        check_query = "SELECT COUNT(*) FROM sites WHERE URL = %s"
-        cursor = execute_query(connection, check_query, (url,))
-        count = fetchone(cursor)[0]
-
-        if count > 0:
-            update_query = "UPDATE sites SET Ref = Ref + 1, links = CONCAT(COALESCE(links, ''), %s) WHERE URL = %s"
-            update_data = (f',{link_id}' if link_id else '', url)
-
-            cursor = execute_query(connection, update_query, update_data, commit=True)
-            #print(update_query, update_data)
-            #print(f"{checkcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.YELLOW} URL Found: {url}")
-            logger.loggingDebug(f"URL Found: {url}")
-            return f"{checkcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.YELLOW} URL Found: {url}", "0-" + url
-        else:
-            insert_query = "INSERT INTO sites (URL, links) VALUES (%s, %s)"
-            insert_data = (url, str(link_id) if link_id else None)
-
-            cursor = execute_query(connection, insert_query, insert_data, commit=True)
-            #print(f"{addcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.GREEN} Added: {url}")
-            logger.loggingDebug(f"Added: {url}")
-            try:
-                return f"{addcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.GREEN} Added: {url}", "1-" + url
-            except:
-                logger.loggingWarning(f"Missed returning message")
-                return ""
-    except mysql.connector.Error as err:
-        print(f"Error: {err}")
-        return "Null", "Null"
-
-
-def update_checked_status(url):
-    update_query = "UPDATE sites SET checked = 1 WHERE url = %s"
-
-    try:
-        execute_query(connection, update_query, (url,), commit=True)
-
-        #print(f"Checked status updated for URL: {url}")
-
-    except mysql.connector.Error as err:
-        logger.loggingError(f"Error: {err}")
-        #print(f"Error: {err}")
-
-def get_unchecked_url():
-
-    try:
-        select_query = "SELECT URL FROM sites WHERE checked = 0 ORDER BY RAND() LIMIT 1"
-        cursor = execute_query(connection, select_query)
-        result = fetchone(cursor)
-
-        if result:
-            unchecked_url = result[0]
-            logger.loggingDebug(f"Unchecked URL found: {unchecked_url}")
-            #print(f"{foundcheck} Unchecked URL found: {unchecked_url}")
-        else:
-            logger.loggingError(f"No unchecked URLs found.")
-            #print(f"{Fore.RED}No unchecked URLs found.")
-
-        update_checked_status(result[0])
-        return result[0] if result else None
-    
-    except:
-        logger.loggingError("Error found in get_unchecked_url()")
-
-def get_sites_count():
-
-    count_query = "SELECT COUNT(*) FROM sites"
-    cursor = execute_query(connection, count_query)
-    result = fetchone(cursor)
-    
-    if result:
-        records_count = result[0]
-    else:
-        logger.loggingError(f"Unable to retrieve records count.")
-        #print(f"{Fore.RED}Unable to retrieve records count.")
-
-    return str(records_count) if result else None
-
-
-def get_sites_checked():
-
-    count_query = "SELECT COUNT(*) FROM sites WHERE checked = 0;"
-    cursor = execute_query(connection, count_query)
-    result = fetchone(cursor)
-    
-    if result:
-        checked = result[0]
-    else:
-        logger.loggingError(f"Unable to retrieve records count.")
-        #print(f"{Fore.RED}Unable to retrieve records count.")
-
-    return str(checked) if result else None
-
-def split_string(connection, link_id):
-    select_query = "SELECT links FROM sites WHERE ID = ?"
-    cursor = execute_query(connection, select_query, (link_id,))
-    result = fetchone(cursor)
-
-    if result:
-        links = result[0]
-        link_ids = links.split(',')
-        return [int(link_id) for link_id in link_ids if link_id.isdigit()]
-    return []
-
-def get_data(linkurl):
-    get_id_query = "SELECT ID FROM sites WHERE URL = ?"
-    cursor = execute_query(connection, get_id_query, (linkurl,))
-    link_id_result = fetchone(cursor)
-    if link_id_result:
-        link_id = link_id_result[0]
-    else:
-        logger.error(f"URL not found in the database.")
+        with Session(engine) as session:
+            statement = select(Websites).where(Websites.Checked == False).limit(1).order_by(func.random())
+            result = session.exec(statement).first()
+            if result:
+                return result.URL
+            else:
+                logger.loggingWarning("No unchecked URLs available.")
+                return None
+    except Exception as e:
+        logger.loggingError(f"Error retrieving unchecked URL: {e}")
         return None
 
-    execute_query(connection, "DROP TABLE IF EXISTS temp_links;", commit=True)
-    execute_query(connection, "CREATE TABLE temp_links (link_id INTEGER);", commit=True)
+def updateCheckedStatus(site_url: str, status_code: int) -> None:
+    '''
+    Updates the checked status and status code of a URL in the database.
+    Args:
+        site_url (str): The URL to update.
+        status_code (int): The HTTP status code to record.
+    Returns:
+        None
+    '''
+    # Handle case where site_url is a list
+    if isinstance(site_url, list):
+        site_url = site_url[0]
+    try:
+        with Session(engine) as session:
+            statement = select(Websites).where(Websites.URL == site_url)
+            result = session.exec(statement).first()
+            if result:
+                result.Checked = True
+                result.StatusCode = status_code
+                result.LastChecked = datetime.now()
+                session.add(result)
+                session.commit()
+    except Exception as e:
+        logger.loggingError(f"Error updating checked status for {site_url}: {e}")
 
-    # Simulate CALL splitString
-    link_ids = split_string(connection, link_id)
-    insert_query = "INSERT INTO temp_links (link_id) VALUES (?);"
-    for lid in link_ids:
-        execute_query(connection, insert_query, (lid,), commit=True)
+def addWebsite(link_url: str, new_page: str, urls: list, clientid: str, status_code: int) -> None:
+    '''
+    Adds a new website and its links to the database.
+    Args:
+        link_url (str): The URL of the website to add.
+        urls (list): A list of URLs that the website links to.
+        clientid (str): The ID of the client adding the website.
+        status_code (int): The HTTP status code of the website.
+    Returns:
+        None
+    '''
+    try:
+        with Session(engine) as session:
+            # Find ID from link_url
+            statement = select(Websites).where(Websites.URL == link_url)
+            result = session.exec(statement).first()
+            if result:
+                site_id = result.ID
+                result.StatusCode = status_code  # Update the status code
+                session.add(result)
+            else:
+                new_website = Websites(URL=link_url, Ref=json.dumps([]), Checked=False, StatusCode=status_code)
+                session.add(new_website)
+                session.commit()
+                session.refresh(new_website)
+                site_id = new_website.ID
 
-    result_cursor = execute_query(connection, """
-        SELECT URL
-        FROM sites
-        WHERE ID IN (
-            SELECT link_id
-            FROM temp_links
-        );
-    """)
-    result = fetchall(result_cursor)
+            # Add new websites
+            for url in urls:
+                statement = select(Websites).where(Websites.URL == url)
+                existing_website = session.exec(statement).first()
+                if not existing_website:
+                    new_website = Websites(
+                        URL=url,
+                        Ref=json.dumps([site_id]),  # Initialize with the current site_id
+                        Checked=False
+                    )
+                    session.add(new_website)
+                else:
+                    # Update Ref to append the new site_id
+                    existing_refs = json.loads(existing_website.Ref)
+                    if site_id not in existing_refs:
+                        existing_refs.append(site_id)
+                        existing_website.Ref = json.dumps(existing_refs)
+                        session.add(existing_website)
 
-    execute_query(connection, "DROP TABLE IF EXISTS temp_links;", commit=True)
-    return result
+            session.commit()
+    except Exception as e:
+        logger.loggingError(f"Error adding website {link_url} by client {clientid}: {e}")
 
+def batchAddWebsites(urls: List[str], page: str, link_url: str, clientid: str) -> List[Tuple[str, str]]:
+    '''
+    Adds a batch of websites to the database.
+    Args:
+        urls (list): A list of website URLs to add.
+        page (str): The content of the page.
+        link_url (str): The URL linking to the websites.
+        clientid (str): The ID of the client adding the websites.
+    Returns:
+        List[Tuple[str, str]]: Results of the operation.
+    '''
+    try:
+        results = []
+        if isinstance(urls, str):
+            urls = [urls]
 
-# TODO - Add Procedure to script, or add this manually to make this work again
+        with Session(engine) as session:
+            # Get ID of link_url
+            statement = select(Websites).where(Websites.URL == link_url)
+            result = session.exec(statement).first()
+            if result:
+                site_id = result.ID
 
-'''
-DROP PROCEDURE IF EXISTS splitString;
+            # Prepare new websites to add
+            for url in urls:
+                website = session.exec(select(Websites).where(Websites.URL == url)).first()
+                if not website:
+                    new_website = Websites(
+                        URL=url,
+                        Ref=json.dumps([site_id]),  # Initialize with the current site_id
+                        Checked=False,
+                        LinksTo=site_id
+                    )
+                    session.add(new_website)
+                    results.append((f"{addcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.GREEN} Added: {url}", "1-" + url))
+                else:
+                    # Update Ref to append the new site_id
+                    existing_refs = json.loads(website.Ref)
+                    if site_id not in existing_refs:
+                        existing_refs.append(site_id)
+                        website.Ref = json.dumps(existing_refs)
+                        session.add(website)
+                    results.append((f"{checkcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.YELLOW} URL Found: {url}", "0-" + url))
 
-DELIMITER $$
+            # Add page content to link_url
+            if page:
+                page_entry = session.exec(select(Pages).where(Pages.SiteID == site_id)).first()
+                if not page_entry:
+                    new_page = Pages(
+                        SiteID=site_id,
+                        Page=page,
+                        Language="Unknown",  # Default value for Language
+                        category="Unknown"  # Default value for category
+                    )
+                    session.add(new_page)
+                else:
+                    page_entry.Page = page
+                    session.add(page_entry)
 
-CREATE PROCEDURE splitString(input VARCHAR(16384))
-BEGIN
-    DECLARE delim VARCHAR(1) DEFAULT ',';
-    DECLARE position INT;
-    DECLARE piece VARCHAR(255);  -- Declare piece variable outside the loop
-    SET position = 1;
-    SET input = CONCAT(input, delim);
-
-    -- Initialize piece variable
-    SET piece = SUBSTRING(input, position, LOCATE(delim, input, position) - position);
-
-    WHILE LOCATE(delim, input, position) > 0 DO
-        SET piece = SUBSTRING(input, position, LOCATE(delim, input, position) - position);
-        INSERT INTO temp_links (link_id) VALUES (CAST(piece AS INT));  -- Insert values directly into the temp_links table
-        SET position = LOCATE(delim, input, position) + 1;
-    END WHILE;
-END$$
-
-DELIMITER ;
-'''
-
-
-def batchUpdateUrl(connection, urls: List[str], page: str, link_url: str, clientid: str) -> List[Tuple[str, str]]:
-    # Get a list of the urls that's currently in the DB
-    check_query = "SELECT URL FROM sites WHERE URL IN (%s)" % ','.join(['%s'] * len(urls))
-    urls = list(urls)
-    cursor = execute_query(connection, check_query, tuple(urls))
-    existing_urls = set(row[0] for row in cursor.fetchall())  # URLs that already exist in the DB
-
-    # Get ID of linking URL
-    check_query = "SELECT ID FROM sites WHERE URL = %s"
-    cursor = execute_query(connection, check_query, (link_url,))
-    link_id = cursor.fetchone()
-
-    link_id = str(re.sub("[(]", "", re.sub("[)]", "", re.sub("[,]", "", str(link_id)))))
-
-    # Prepare urls for batch processing
-    update_data = []
-    insert_data = []
-    results = []
-
-    # Handle the urls
-    for url in urls:
-        if url in existing_urls:
-            # Prepare data for updating
-            update_data.append((f',{link_id}' if link_id else '', url))
-            results.append((f"{checkcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.YELLOW} URL Found: {url}", "0-" + url))
-        else:
-            # Prepare data for inserting
-            insert_data.append((url, str(link_id) if link_id else ''))
-            results.append((f"{addcode}{IDCodeOpen}{clientid}{IDCodeClose}{Fore.GREEN} Added: {url}", "1-" + url))
-
-    # Handle the page data
-    if link_id:
-        insert_query = "INSERT INTO pages (SiteID, Page) VALUES (%s, %s)"
-        execute_query(connection, insert_query, (link_id, page), commit=True)
-
-    # Execute batch updates
-    if update_data:
-        if DBType == 'sqlite':
-            update_query = """
-                UPDATE sites
-                SET Ref = Ref + 1, links = COALESCE(links, '') || ?
-                WHERE URL = ?
-            """
-        else:
-            update_query = """
-                UPDATE sites
-                SET Ref = Ref + 1, links = CONCAT(COALESCE(links, ''), %s)
-                WHERE URL = %s
-            """
-
-        execute_query(connection, update_query, update_data, commit=True, many=True)
-
-    # Execute batch inserts
-    if insert_data:
-        insert_query = "INSERT INTO sites (URL, links) VALUES (%s, %s)"
-        execute_query(connection, insert_query, insert_data, commit=True, many=True)
+            session.commit()
+            logger.loggingInfo(f"Client {clientid} batch added {len(urls)} websites.")
+    except Exception as e:
+        logger.loggingError(f"Error batch adding websites by client {clientid}: {e}")
 
     return results
 
+def createRobotsTxt(site_url: str, allowed: list, disallowed: list, user_agent: str) -> None:
+    '''
+    Creates a new robots.txt entry in the database.
 
-# Fetch the data that is already categorized
-def fetchTrainData(connection):
-    fetchQuery = "SELECT Page, Category FROM pages WHERE Page IS NOT NULL AND Category IS NOT NULL"
-    cursor = execute_query(connection, fetchQuery)
-    data = cursor.fetchall()
-    page, category = zip(*data) if data else ([], [])
-    print("Training Data Collected")
-    return list(page), list(category)
+    Params:
+        site_url: str - The URL of the site.
+        allowed: list - Allowed paths as a list.
+        disallowed: list - Disallowed paths as a list.
+        user_agent: str - User agent the rules apply to.
+    Returns:
+        None
+    '''
+    try:
+        with Session(engine) as session:
+            # Get site ID from site_url
+            statement = select(Websites).where(Websites.URL == site_url)
+            result = session.exec(statement).first()
+            if result:
+                site_id = result.ID
+            else:
+                raise ValueError(f"Site URL {site_url} not found in database")
 
-def fetchUnlabeledData(connection, limit=50):
-    fetchQuery = "SELECT ID, Page FROM pages WHERE Page IS NOT NULL AND Category IS NULL LIMIT ?"
-    cursor = execute_query(connection, fetchQuery, (limit,))
-    data = cursor.fetchall()
-    print(f"{limit} rows of unlabeled data collected")
-    return data
+            new_robots_txt = RobotsTxt(
+                SiteID=site_id,
+                Allowed=json.dumps(allowed),  # Store as JSON string
+                Disallowed=json.dumps(disallowed),  # Store as JSON string
+                UserAgent=user_agent,
+                LastFetched=datetime.now()
+            )
+            session.add(new_robots_txt)
+            statement = select(Websites).where(Websites.URL == site_url)
+            result = session.exec(statement).first()
+            if result:
+                result.RobotsTxt = True
+                session.add(result)
+                session.commit()
+            session.commit()
+    except Exception as e:
+        logger.loggingError(f"Error creating robots.txt for site {site_url}: {e}")
 
-def updateCategoryData(connection, pageID, category):
-    updateQuery = "UPDATE pages SET Category = ? WHERE ID = ?"
-    execute_query(connection, updateQuery, (category, pageID), commit=True)
-    return
-
-
-
-
-
-def get_data_simple():
-
-    count_query = "SELECT ID, URL, Links FROM sites LIMIT 50"
-    cursor = execute_query(connection, count_query)
-    result = fetchall(cursor)
-    
-    return result
-
-if __name__ == '__main__':
-    print()
-    print("-----------------------------------")
-    print("Hey! Run URLServer.py not this file")
-    print("-----------------------------------")
+def getRobotsTxt(site_id: int) -> dict:
+    '''
+    % Retrieves the robots.txt rules for a given site.
+    %
+    Params:
+        site_id: int - The ID of the site.
+    Returns:
+        dict: The robots.txt rules or None if not found.
+    '''
+    try:
+        with Session(engine) as session:
+            statement = select(RobotsTxt).where(RobotsTxt.SiteID == site_id)
+            result = session.exec(statement).first()
+            if result:
+                return {
+                    'allowed': result.Allowed,
+                    'disallowed': result.Disallowed,
+                    'user_agent': result.UserAgent,
+                    'last_fetched': result.LastFetched
+                }
+            return None
+    except Exception as e:
+        logger.loggingError(f"Error retrieving robots.txt for site {site_id}: {e}")
+        return None
