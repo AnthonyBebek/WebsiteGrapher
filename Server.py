@@ -1,144 +1,130 @@
-import logger
-import logging
-import DB
-import argparse
-from ClientHandling import *
-from flask import Flask, jsonify, request, render_template
-from colorama import init, Fore, Style
-from datetime import timedelta
-import threading
-import time
-init()
+from typing import Union
+from fastapi import FastAPI, Request
+import DB as DB
+from ClientHandling import Client
+from datetime import datetime, timedelta
+import Logger as logger
 
 ClientCount = 0
-
-StatUpdateInterval = 60
-
-ServerInfo = F"{Fore.WHITE}[{Fore.MAGENTA}Server Info{Fore.WHITE}]{Fore.MAGENTA}"
-
-app = Flask(__name__)
-
-parser = argparse.ArgumentParser(description="Options:")
-
-parser.add_argument('--suppressWarn', action='store_true', help='Suppress warning messages (Only use this if you really know what you are doing!)')
-args = parser.parse_args()
-
-DB.SuppressWarnings = args.suppressWarn
-
-LastServerStatUpdate = time.time()
-
-DB.start_db()
-DB.get_server_stats()
-
-def ClientCleaner():
-    try:
-        while not stop_event.is_set():
-            clients = Client.GetClients()
-            now = datetime.datetime.now()
-            
-            for client in clients:
-                if (now - client.LastHeartbeat).total_seconds() >= 60:
-                    logger.loggingInfo(f"Killed client: {client.ClientNumber} Last heartbeat was: {(now - client.LastHeartbeat).total_seconds()} ago")
-                    client.ReleaseClientNumber()
-            time.sleep(1)
-    except Exception as e:
-        logger.loggingError(f"Exception in ClientCleaner: {e}")
-
-stop_event = threading.Event()
-
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
-
-Current_Urls = []
-
 ClientList = []
 
-previous_time = datetime.datetime(2024, 4, 5, 12, 0, 0)
-StatValues = [0, 0, 0, 0]
+app = FastAPI()
 
-@app.route('/query', methods=['GET'])
-async def query():
-    url = DB.get_unchecked_url()
+# Deifne root path
+@app.get("/")
+def read_root():
+    """
+    Handles GET requests to the root URL.
+    """
+    return {"ClientCount": Client.GetClientCount()}
+
+# Define path for getting new links
+@app.get("/new_link")
+def readItem():
+    """
+    Handles GET requests to retrieve a new link.
+    return str: link
+    """
+    url = DB.getUncheckedURL()
     if url != None:
         response = {'url': url}
-        return jsonify(response)
+        return response
     return
 
-@app.route('/update', methods=['POST'])
-async def update():
-    start_time = time.perf_counter()
-    data = request.get_json()
-    url = data.get('url', '')
-    old_url = data.get('old_url', '')
-    client_id = data.get('Client', '')
-    client = Client.GetClient(str(client_id))
-    if client == None:
-        logger.loggingWarning(f"Client '{client_id}' does not exsist!")
-        return ""
-    client.UpdateHeartbeat()
-    Current_Urls.insert(0, url)
-
-    if len(Current_Urls) > 14:
-        Current_Urls.pop()
-    try:    
-        output, output2 = DB.insert_into_sites(old_url, url, client_id)
-        print(time.perf_counter() - start_time)
-        return output.replace("\n", "")
-    except Exception as e:
-        print("returing Nothing:", e)
-        return ""
-
-@app.route('/update_checked_urls', methods=['POST'])
-async def update_checked_urls_route():
-    data = request.json
-    global checked_urls
-    checked_urls = data.get('checked_urls', [])
-    DB.update_checked_status(data.get('checked_urls', []))
-    return "Ok"
-
-@app.route('/newclient', methods=['GET'])
-async def newclient():
-    NewClient = Client(datetime.datetime.now(), str(request.remote_addr))
-    ClientList.append(NewClient)
-    response = {'Client': str(NewClient.ClientNumber)}
-    logger.loggingInfo(f"Registered Client: {NewClient.ClientNumber} At: {request.remote_addr}")
-     
-    return jsonify(response)
-
-
-@app.route('/disconnect', methods=['POST'])
-async def disconnect():
-    data = request.json
-    Disconnect_ID = data.get('ID', [])
-    Disconnect_Url = data.get('URL', [])
-    logger.loggingInfo(f"Clinet {Disconnect_ID} disconnected, rechecking {Disconnect_Url}")
-    return "Ok"
-
-@app.route('/reconnect', methods=['POST'])
-async def reconnect():
-    data = request.json
-    Client_ID = data.get('client', [])
-    NewClient = Client(datetime.datetime.now(), str(request.remote_addr), str(Client_ID))
-    ClientList.append(NewClient)
-    response = {'Client Restored': str(Client_ID)}
-    return jsonify(response)
-
-def runFlask():
-    app.run(host='0.0.0.0', port=27016)
-
-if __name__ == '__main__':
-    background_thread = threading.Thread(target=ClientCleaner)
-    background_thread.start()
-
-    runFlask()
-
+@app.post("/update")
+def updateLinks(payload: dict):
+    """
+    Handles POST requests to update links.
+    payload: dict containing 'url', 'page', 'old_url', and 'Client'
+    return list: updated links
+    """
     try:
-        while True:
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        print("Closing Server")
-        stop_event.set()
-        background_thread.join()
-        import os
-        os._exit(0)
+        # Unpack payload
+        new_url = payload.get('url')
+        new_page = payload.get('page')
+        old_url = payload.get('old_url')
+        client_id = payload.get('Client')
 
+        # Handle client heartbeat
+        client = Client.GetClient(client_id)
+        if client_id is None:
+            logger.loggingWarning(f"Client {client_id} doesn't exsist!")
+            return {"error": "Client ID is missing"}
+        else:
+            client.UpdateHeartbeat()
+
+        # Update links in the database
+        updated_links = DB.batchAddWebsites(new_url, new_page, old_url, client_id)
+        return updated_links
+    except Exception as e:
+        return {"error": str(e)}
+    
+@app.post("/update_checked_urls")
+def updateCheckedUrls(payload: dict):
+    """
+    Handles POST requests to update checked URLs.
+    payload: dict containing 'checked_urls'
+    """
+    try:
+        checked_urls = payload.get('checked_urls')
+        StatusCode = payload.get('StatusCode')
+        DB.updateCheckedStatus(checked_urls, StatusCode)
+        if StatusCode == 429:
+            logger.loggingWarning(f"Received 429 Too Many Requests for URLs: {checked_urls}")
+        return {"status": "success"}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get('/new_client')
+def newClient(request: Request):
+    """
+    Handles GET requests to register a new client.
+    return int: client ID
+    """
+    # Register new client
+    client_ip = request.client.host
+    new_client = Client(datetime.now(), client_ip)
+    ClientList.append(new_client)
+    client_id = new_client.ClientNumber
+    logger.loggingInfo(f"New client connected: {client_id} from IP: {client_ip}")
+    return {"ClientID": client_id}
+
+@app.get("/robots_txt/{site_id}")
+def getRobotsTxt(site_id: int):
+    '''
+    % Retrieves the robots.txt rules for a given site.
+    %
+    Params:
+        site_id: int - The ID of the site.
+    Returns:
+        dict: The robots.txt rules or an error message.
+    '''
+    try:
+        robots_txt = DB.getRobotsTxt(site_id)
+        if robots_txt:
+            return robots_txt
+        else:
+            return {"error": "No robots.txt found for site."}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/robots_txt")
+def AddRobotsTxt(payload: dict):
+    '''
+    % Creates or updates the robots.txt rules for a site.
+    %
+    Params:
+        payload: dict - Contains 'site_url', 'allowed', 'disallowed', and 'user_agent'.
+    Returns:
+        dict: Success or error message.
+    '''
+    try:
+        site_url = payload.get('site_url')
+        allowed = payload.get('allowed')
+        disallowed = payload.get('disallowed')
+        user_agent = payload.get('user_agent')
+        
+        DB.createRobotsTxt(site_url, allowed, disallowed, user_agent)
+        return {"status": "created"}
+    except Exception as e:
+        return {"error": str(e)}

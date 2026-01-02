@@ -3,5 +3,12 @@ db_config.py
 __pycache__
 *.pyc
 *.sqlite
+*.pkl
+*.bat
 .dockerignore
 .venv
+venv
+env/
+*.ps1
+*.db
+temp.sh
