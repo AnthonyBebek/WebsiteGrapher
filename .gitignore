@@ -8,7 +8,10 @@ __pycache__
 .dockerignore
 .venv
 venv
-env/
 *.ps1
 *.db
 temp.sh
+
+.env
+
+!.env.template
